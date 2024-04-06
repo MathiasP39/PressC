@@ -12,17 +12,18 @@ Launch it with command : ./Client ip port type (type is 0 for send first and 1 f
 
 int main(int argc, char *argv[]) {
 
+    //Check of number of argument
     if (argc =! 4) {
-        perror("Nombre d'argument incorrect");
+        perror("Incorrect number of aruments");
         exit(0);
     }
     printf("Program launched\n");
 
-    int type = atoi(argv[3]);
-
+    //Socket creation
     int dS = socket(PF_INET, SOCK_STREAM, 0);
     printf("Socket Created\n");
 
+    //Socket connection
     struct sockaddr_in aS;
     aS.sin_family = AF_INET;
     inet_pton(AF_INET,argv[1],&(aS.sin_addr));
@@ -32,13 +33,28 @@ int main(int argc, char *argv[]) {
     printf("Socket Connected\n");
 
     bool running = true;
-
+    int type = atoi(argv[3]);
+    /*
+    Here is the loop that run the program,  should be interrupted when the senders type "fin"
+    To add : Typing of message in console and end of chat with "fin" word
+    */
     while (running){
         switch (type) {
+            //Sender Case
             case 0:
-                type = 1;
+                char message[300] = "Hello the pc this the earth" ; // Message creation
+                send(dS, message, 300 , 0) ; // Sending of message to server 
+                printf("Le message envoye est %s \n", message); //Check of what is the message send
+                printf("Message Envoyé \n"); //Confirm of sending
+                free(message);
+                type = 1; //Switch type of client
+            //Receiver Case
             case 1:
-                type = 0;
+                char * message = malloc(sizeof(char) * 300); //Allocation of space for the message 
+                recv(dS, message, 300, 0); //Reception of message
+                printf("%s",message);
+                free(message);
+                type = 0;//Switch type of client
         }
     }
     
