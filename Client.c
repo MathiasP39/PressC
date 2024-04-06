@@ -48,6 +48,7 @@ int main(int argc, char *argv[]) {
                 printf("Message Envoyé \n"); //Confirm of sending
                 free(message);
                 type = 1; //Switch type of client
+                break;
             //Receiver Case
             case 1:
                 char * message = malloc(sizeof(char) * 300); //Allocation of space for the message 
@@ -55,6 +56,7 @@ int main(int argc, char *argv[]) {
                 printf("%s",message);
                 free(message);
                 type = 0;//Switch type of client
+                break;
         }
     }
     

@@ -6,12 +6,15 @@
 #include <unistd.h>
 
 
+//Command to launch this program : ./Serveur port 
 
 int main(int argc, char *argv[]) {
 
     if (argc != 2) { //security : check if the number of arguments is correct
-        printf("Number of arguments incorrect\n");
+        //printf("Number of arguments incorrect\n");
+        perror("Incorrect number of arguments");
         printf("Usage : %s <port>\n", argv[0]);
+        exit(0);
         return -1;
     }
 
