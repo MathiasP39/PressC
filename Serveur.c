@@ -4,9 +4,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 
 //Command to launch this program : ./Serveur port 
+/*
+This program should act as a relay of message 
+This should start the conversation when 2 Clients are connected, capture the senders and the receiver and switch them, and end when "fin" is sended by someone
+*/
 
 int main(int argc, char *argv[]) {
 
@@ -19,6 +24,13 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Start program\n");
+
+    bool running = true;
+
+    while (running) {
+        
+    }
+
 
     int dS = socket(PF_INET, SOCK_STREAM, 0); //keep the socket descriptor (id of the socket)
     printf("Socket created\n");

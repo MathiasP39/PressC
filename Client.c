@@ -34,6 +34,7 @@ int main(int argc, char *argv[]) {
 
     bool running = true;
     int type = atoi(argv[3]);
+    
     /*
     Here is the loop that run the program,  should be interrupted when the senders type "fin"
     To add : Typing of message in console and end of chat with "fin" word
