@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
         switch (type) {
             //Sender Case
             case 0:
-                char message[300] = "Hello the pc this the earth" ; // Message creation
+                char message[300] = "Hello the pc this is the earth" ; // Message creation
                 send(dS, message, 300 , 0) ; // Sending of message to server 
                 printf("Le message envoye est %s \n", message); //Check of what is the message send
                 printf("Message Envoyé \n"); //Confirm of sending
