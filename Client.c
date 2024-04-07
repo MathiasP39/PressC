@@ -32,9 +32,14 @@ int main(int argc, char *argv[]) {
     connect(dS, (struct sockaddr *) &aS, lgA);
     printf("Socket Connected\n");
 
+
     bool running = true;
     int type = atoi(argv[3]);
-    
+
+    send(dS,&type,sizeof(int),0);
+
+
+    char * message = (char *)malloc(sizeof(char) * 301); //Allocation of space for the message 
     /*
     Here is the loop that run the program,  should be interrupted when the senders type "fin"
     To add : Typing of message in console and end of chat with "fin" word
@@ -43,19 +48,19 @@ int main(int argc, char *argv[]) {
         switch (type) {
             //Sender Case
             case 0:
-                char message[300] = "Hello the pc this is the earth" ; // Message creation
+                //char message[300] = "Hello the pc this is the earth" ; // Message creation
                 send(dS, message, 300 , 0) ; // Sending of message to server 
                 printf("Le message envoye est %s \n", message); //Check of what is the message send
                 printf("Message Envoyé \n"); //Confirm of sending
-                free(message);
+                //free(message);
                 type = 1; //Switch type of client
                 break;
             //Receiver Case
             case 1:
-                char * message = malloc(sizeof(char) * 300); //Allocation of space for the message 
+                //char * message = (char *)malloc(sizeof(char) * 301); //Allocation of space for the message 
                 recv(dS, message, 300, 0); //Reception of message
                 printf("%s",message);
-                free(message);
+                //free(message);
                 type = 0;//Switch type of client
                 break;
         }

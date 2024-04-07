@@ -15,7 +15,7 @@ This should start the conversation when 2 Clients are connected, capture the sen
 
 int main(int argc, char *argv[]) {
 
-    if (argc != 2) { //security : check if the number of arguments is correct
+    if (argc != 3) { //security : check if the number of arguments is correct
         //printf("Number of arguments incorrect\n");
         perror("Incorrect number of arguments");
         printf("Usage : %s <port>\n", argv[0]);
@@ -58,8 +58,8 @@ int main(int argc, char *argv[]) {
         }
         printf("Socket 1 named\n");
         
-        int connect = bind(dS1, (struct sockaddr*)&adresse1, sizeof(adresse1)); //variable "connect" to avoid conflict with the function connect
-        if (connect != 0) {
+        int connect1 = bind(dS2, (struct sockaddr*)&adresse2, sizeof(adresse2)); //variable "connect" to avoid conflict with the function connect
+        if (connect1 != 0) {
             printf("Connection error: bind failed\n");
             return connect;
         }
@@ -73,8 +73,8 @@ int main(int argc, char *argv[]) {
         }
         printf("Listening mode\n");
 
-        int ecoute = listen(dS2,1);
-        if (ecoute < 0) {
+        int ecoute1 = listen(dS2,1);
+        if (ecoute1 < 0) {
             perror("Connection error: listen failed\n");
             return ecoute;
         }
@@ -87,47 +87,72 @@ int main(int argc, char *argv[]) {
             perror("Connection error: client failed to connect\n");
             return -1;
         }
-        printf("\n--Client connected--\n\n");
+        printf("\n--Client connected 1--\n\n");
 
+        struct sockaddr_in aD ;
+        socklen_t lenght1 = sizeof(struct sockaddr_in); //keep the length of the address
+        int dSClient2 = accept(dS2, (struct sockaddr*) &aD, &lenght1); //keep the (new) socket descriptor of the client
+        if (dSClient2 == -1) {
+            perror("Connection error: client failed to connect\n");
+            return -1;
+        }
+        printf("\n--Client connected 2--\n\n");
 
+        int type_of_client;
+
+        int res = recv(dSClient1, &type_of_client, sizeof(int), 0);
+
+        int * dSClientReceiver = (int *)malloc(sizeof(int));
+
+        int * dSClientSender = (int *)malloc(sizeof(int));
+
+        //There is a problem there, when wyou execute, it sends the error below
+        if (res != 0) {
+            perror("Reception failed");
+            exit(res);
+        }
+
+        if (type_of_client == 1) {
+            dSClientReceiver = &dSClient1;
+
+            int res = recv(dSClient2, &type_of_client, sizeof(int), 0);
+
+            if (res != 0) {
+                perror("Reception failed");
+                exit(res);
+            }
+
+            if (type_of_client != 0) {
+                perror("You should have a sender and a receiver, the 2 clients have the same function in this situation");
+                exit(-1);
+            }
+            else {
+                dSClientSender = &dSClient2;
+            }
+        }
+        else {
+            dSClientSender = &dSClient1;
+
+            int res = recv(dSClient2, &type_of_client, sizeof(int), 0);
+
+            if (res != 0) {
+                perror("Reception failed");
+                exit(res);
+            }
+
+            if (type_of_client != 1) {
+                perror("You should have a sender and a receiver, the 2 clients have the same function in this situation");
+                exit(-1);
+            }
+            else {
+                dSClientReceiver = &dSClient2;
+            }
+        }
+
+        printf("Initialisation réussi") ;
         
     }
-
-    int dS = socket(PF_INET, SOCK_STREAM, 0); //keep the socket descriptor (id of the socket)
-    printf("Socket created\n");
-
-    struct sockaddr_in ad;
-    ad.sin_family = AF_INET; //address family
-    ad.sin_addr.s_addr = INADDR_ANY; //address to accept any incoming messages
-    ad.sin_port = htons(atoi(argv[1])); //port passed as argument
-
-    int connect = bind(dS, (struct sockaddr*)&ad, sizeof(ad)); //variable "connect" to avoid conflict with the function connect
-    if (connect < 0) {
-        printf("Connection error: bind failed\n");
-        return -1;
-    }
-    printf("Socket named\n");
-
-    int ecoute = listen(dS, 7); //variable "ecoute" to avoid conflict with the function listen
-    if (ecoute < 0) {
-        printf("Connection error: listen failed\n");
-        return -1;
-    }
-    printf("Listening mode\n");
-
-    struct sockaddr_in aC ;
-    socklen_t lenght = sizeof(struct sockaddr_in); //keep the length of the address
-    int dSC = accept(dS, (struct sockaddr*) &aC, &lenght); //keep the (new) socket descriptor of the client
-    if (dSC == -1) {
-        printf("Connection error: client failed to connect\n");
-        return -1;
-    }
-    printf("\n--Client connected--\n\n");
-    
     char msg [300]; //message buffer : 300 characters max
-
-    int rec = recv(dSC, msg, sizeof(msg), 0);
-    msg[rec] = '\0';
     printf("Message received : %s\n", msg);
 
 
