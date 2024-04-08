@@ -8,6 +8,8 @@
 /*
 This program generates client for communication
 Launch it with command : ./Client ip port type (type is 0 for send first and 1 for receive first)
+//Example : ./Client 127.0.0.1 3500 0 
+// ./Client 127.0.0.1 3501 1 
 */
 
 int main(int argc, char *argv[]) {
@@ -65,5 +67,5 @@ int main(int argc, char *argv[]) {
                 break;
         }
     }
-    
+    shutdown(dS,2);
 }

@@ -8,6 +8,7 @@
 
 
 //Command to launch this program : ./Serveur port1 port2
+// Exemple : ./Serveur 3500 3501
 /*
 This program should act as a relay of message 
 This should start the conversation when 2 Clients are connected, capture the senders and the receiver and switch them, and end when "fin" is sended by someone
@@ -106,10 +107,12 @@ int main(int argc, char *argv[]) {
 
         int * dSClientSender = (int *)malloc(sizeof(int));
 
+        printf("Le type recu est : %d \n",type_of_client);
+
         //There is a problem there, when wyou execute, it sends the error below
-        if (res != 0) {
+        if (res < 0) {
             perror("Reception failed");
-            exit(res);
+            exit(-1);
         }
 
         if (type_of_client == 1) {
@@ -117,9 +120,9 @@ int main(int argc, char *argv[]) {
 
             int res = recv(dSClient2, &type_of_client, sizeof(int), 0);
 
-            if (res != 0) {
+            if (res < 0) {
                 perror("Reception failed");
-                exit(res);
+                exit(-1);
             }
 
             if (type_of_client != 0) {
@@ -135,7 +138,7 @@ int main(int argc, char *argv[]) {
 
             int res = recv(dSClient2, &type_of_client, sizeof(int), 0);
 
-            if (res != 0) {
+            if (res < 0) {
                 perror("Reception failed");
                 exit(res);
             }
@@ -149,11 +152,32 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        printf("Initialisation réussi") ;
+        printf("Initialisation réussi \n") ;
+        
+        bool conversation = true;
+
+        while (conversation) {
+            int fermeture;
+            fermeture = shutdown(dS1, 2) ; 
+            if (fermeture < 0) {
+                perror("Error when closing dS1");
+            }
+            fermeture = shutdown(dS2, 2) ;
+            if (fermeture < 0) {
+                perror("Error when closing dS2");
+            }
+            fermeture = shutdown(dSClient1,2);
+            if (fermeture < 0) {
+                perror("Error when closing dSClient1");
+            }
+            fermeture = shutdown(dSClient2,2);
+            if (fermeture < 0) {
+                perror("Error when closing dSClient2");
+            }
+            printf("fin de fermeture \n");
+            conversation = false;
+        }
         
     }
-    char msg [300]; //message buffer : 300 characters max
-    printf("Message received : %s\n", msg);
-
 
 }
