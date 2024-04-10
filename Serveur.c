@@ -28,6 +28,12 @@ int main(int argc, char *argv[]) {
 
     bool running = true;
 
+    int dS1 = socket(PF_INET, SOCK_STREAM, 0); //keep the socket descriptor (id of the socket)
+    printf("Socket 1 created\n");
+
+    int dS2 = socket(PF_INET, SOCK_STREAM, 0); //keep the socket descriptor (id of the socket)
+    printf("Socket 2 created\n");
+
     /*
     One of the problem is to find who is to konow who is the sender and who is the receiver for the start, given that this is alternante next
     The idea here is that the both clients send their type to be affected the correct role
@@ -35,11 +41,6 @@ int main(int argc, char *argv[]) {
 
    //This loop should be running unless there is an external interruption, because this allow to handle the connection of new Clients when the last conversation has ended
     while (running) {
-        int dS1 = socket(PF_INET, SOCK_STREAM, 0); //keep the socket descriptor (id of the socket)
-        printf("Socket 1 created\n");
-
-        int dS2 = socket(PF_INET, SOCK_STREAM, 0); //keep the socket descriptor (id of the socket)
-        printf("Socket 2 created\n");
 
         //Get the adresses of the first Client
         struct sockaddr_in adresse1;
@@ -97,7 +98,7 @@ int main(int argc, char *argv[]) {
             perror("Connection error: client failed to connect\n");
             return -1;
         }
-        printf("\n--Client connected 2--\n\n");
+        printf("\n-- Client 2 connected --\n\n");
 
         int type_of_client;
 
@@ -155,27 +156,39 @@ int main(int argc, char *argv[]) {
         printf("Initialisation réussi \n") ;
         
         bool conversation = true;
-
+        char message[300];
         while (conversation) {
-            int fermeture;
-            fermeture = shutdown(dS1, 2) ; 
-            if (fermeture < 0) {
-                perror("Error when closing dS1");
+
+            int res =  recv(*dSClientSender, &message, sizeof(char)*300, 0);
+            if (res < 0) {
+                perror("Error receiving the message");
+                exit(0);
             }
-            fermeture = shutdown(dS2, 2) ;
-            if (fermeture < 0) {
-                perror("Error when closing dS2");
+
+            res = send(*dSClientReceiver, message, sizeof(char)*300 , 0);
+            if (res < 0) {
+                perror("Error receiving the message");
+                exit(0);
             }
-            fermeture = shutdown(dSClient1,2);
-            if (fermeture < 0) {
-                perror("Error when closing dSClient1");
+
+            if (strcmp(message,"fin")) {
+                int fermeture;
+                fermeture = close(dSClient1);
+                if (fermeture < 0) {
+                    perror("Error when closing dSClient1");
+                }
+                fermeture = close(dSClient2);
+                if (fermeture < 0) {
+                    perror("Error when closing dSClient2");
+                }
+                printf("fin de fermeture \n");
+                conversation = false;
             }
-            fermeture = shutdown(dSClient2,2);
-            if (fermeture < 0) {
-                perror("Error when closing dSClient2");
+            else {
+                int *dSechange = dSClientReceiver;
+                dSClientReceiver = dSClientSender;
+                dSClientSender = dSechange; 
             }
-            printf("fin de fermeture \n");
-            conversation = false;
         }
         
     }

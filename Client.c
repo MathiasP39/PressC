@@ -50,21 +50,28 @@ int main(int argc, char *argv[]) {
         switch (type) {
             //Sender Case
             case 0:
-                //char message[300] = "Hello the pc this is the earth" ; // Message creation
+                message = "Hello the pc this is the earth" ; // Message creation
                 send(dS, message, 300 , 0) ; // Sending of message to server 
                 printf("Le message envoye est %s \n", message); //Check of what is the message send
                 printf("Message Envoyé \n"); //Confirm of sending
                 //free(message);
-                type = 1; //Switch type of client
+                //type = 1; //Switch type of client
                 break;
             //Receiver Case
             case 1:
                 //char * message = (char *)malloc(sizeof(char) * 301); //Allocation of space for the message 
                 recv(dS, message, 300, 0); //Reception of message
-                printf("%s",message);
+                printf("Message recu : %s \n",message);
                 //free(message);
-                type = 0;//Switch type of client
+                //type = 0;//Switch type of client
                 break;
+        }
+
+        if (type == 1){
+            type = 0;
+        }
+        else {
+            type = 1;
         }
     }
     shutdown(dS,2);
