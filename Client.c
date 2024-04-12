@@ -80,13 +80,6 @@ int main(int argc, char *argv[]) {
                     exit(0);
                 }
                 printf("Le message envoye est %s \n", message); //Check of what is the message send
-<<<<<<< HEAD
-                printf("Message Envoyé \n"); //Confirm of sending
-                break;
-            //Receiver Case
-            case 1:
-                recv(dS, message, 300, 0); //Reception of message
-=======
                 printf("Message envoyé \n"); //Confirm of sending
                 //free(message);
                 //type = 1; //Switch type of client
@@ -99,7 +92,6 @@ int main(int argc, char *argv[]) {
                     perror("Receive failed");
                     exit(0);
                 }
->>>>>>> af9e3d8 (Error management for client)
                 printf("Message recu : %s \n",message);
                 break;
         }
