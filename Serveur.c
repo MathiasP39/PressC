@@ -28,44 +28,45 @@ int main(int argc, char *argv[]) {
 
     bool running = true;
 
+    //Create a function to initialize the sockets  ??
     int dS1 = socket(PF_INET, SOCK_STREAM, 0); //keep the socket descriptor (id of the socket)
     printf("Socket 1 created\n");
 
     int dS2 = socket(PF_INET, SOCK_STREAM, 0); //keep the socket descriptor (id of the socket)
     printf("Socket 2 created\n");
 
+    //Get the adresses of the first Client
+    struct sockaddr_in adresse1;
+    adresse1.sin_family = AF_INET; //address family
+    adresse1.sin_addr.s_addr = INADDR_ANY; //address to accept any incoming messages
+    adresse1.sin_port = htons(atoi(argv[1])); //port passed as argument
+
+    struct sockaddr_in adresse2;
+    adresse2.sin_family = AF_INET; //address family
+    adresse2.sin_addr.s_addr = INADDR_ANY; //address to accept any incoming messages
+    adresse2.sin_port = htons(atoi(argv[2])); //port passed as argument
+
+    int connect = bind(dS1, (struct sockaddr*)&adresse1, sizeof(adresse1)); //variable "connect" to avoid conflict with the function connect
+    if (connect != 0) {
+        printf("Connection error: bind failed\n");
+        return connect;
+    }
+    printf("Socket 1 named\n");
+        
+    int connect1 = bind(dS2, (struct sockaddr*)&adresse2, sizeof(adresse2)); //variable "connect" to avoid conflict with the function connect
+    if (connect1 != 0) {
+        printf("Connection error: bind failed\n");
+        return connect;
+    }
+    printf("Socket 2 named\n");
+
     /*
     One of the problem is to find who is to konow who is the sender and who is the receiver for the start, given that this is alternante next
     The idea here is that the both clients send their type to be affected the correct role
     */
-
+   //The part above is 
    //This loop should be running unless there is an external interruption, because this allow to handle the connection of new Clients when the last conversation has ended
     while (running) {
-
-        //Get the adresses of the first Client
-        struct sockaddr_in adresse1;
-        adresse1.sin_family = AF_INET; //address family
-        adresse1.sin_addr.s_addr = INADDR_ANY; //address to accept any incoming messages
-        adresse1.sin_port = htons(atoi(argv[1])); //port passed as argument
-
-        struct sockaddr_in adresse2;
-        adresse2.sin_family = AF_INET; //address family
-        adresse2.sin_addr.s_addr = INADDR_ANY; //address to accept any incoming messages
-        adresse2.sin_port = htons(atoi(argv[2])); //port passed as argument
-
-        int connect = bind(dS1, (struct sockaddr*)&adresse1, sizeof(adresse1)); //variable "connect" to avoid conflict with the function connect
-        if (connect != 0) {
-            printf("Connection error: bind failed\n");
-            return connect;
-        }
-        printf("Socket 1 named\n");
-        
-        int connect1 = bind(dS2, (struct sockaddr*)&adresse2, sizeof(adresse2)); //variable "connect" to avoid conflict with the function connect
-        if (connect1 != 0) {
-            printf("Connection error: bind failed\n");
-            return connect;
-        }
-        printf("Socket 2 named\n");
 
         //Get ready for receiving the type of the client
         int ecoute = listen(dS1,1);
@@ -89,7 +90,7 @@ int main(int argc, char *argv[]) {
             perror("Connection error: client failed to connect\n");
             return -1;
         }
-        printf("\n--Client connected 1--\n\n");
+        printf("\n-- Client connected 1 --\n\n");
 
         struct sockaddr_in aD ;
         socklen_t lenght1 = sizeof(struct sockaddr_in); //keep the length of the address
