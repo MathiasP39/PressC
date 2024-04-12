@@ -56,16 +56,11 @@ int main(int argc, char *argv[]) {
                 send(dS, message, 300 , 0) ; // Sending of message to server 
                 printf("Le message envoye est %s \n", message); //Check of what is the message send
                 printf("Message Envoyé \n"); //Confirm of sending
-                //free(message);
-                //type = 1; //Switch type of client
                 break;
             //Receiver Case
             case 1:
-                //char * message = (char *)malloc(sizeof(char) * 301); //Allocation of space for the message 
                 recv(dS, message, 300, 0); //Reception of message
                 printf("Message recu : %s \n",message);
-                //free(message);
-                //type = 0;//Switch type of client
                 break;
         }
 

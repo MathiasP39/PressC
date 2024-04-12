@@ -14,6 +14,31 @@ This program should act as a relay of message
 This should start the conversation when 2 Clients are connected, capture the senders and the receiver and switch them, and end when "fin" is sended by someone
 */
 
+int creation_socket() {
+        int dS = socket(PF_INET, SOCK_STREAM, 0);
+        printf("Socket created \n");
+        return dS;
+}
+
+struct sockaddr_in param_socket_adresse(char * port) {
+    //Get the adresses of the first Client
+    struct sockaddr_in adresse1;
+    adresse1.sin_family = AF_INET; //address family
+    adresse1.sin_addr.s_addr = INADDR_ANY; //address to accept any incoming messages
+    adresse1.sin_port = htons(atoi(port)); //port passed as argument
+    printf("Adresse creation");
+    return adresse1;
+}
+
+int make_bind(int socket,struct sockaddr_in adresse) {
+    int connect = bind(socket,(struct sockaddr*)&adresse,sizeof(adresse)); //variable "connect" to avoid conflict with the function connect
+    if (connect != 0) {
+        printf("Connection error: bind failed\n");
+        return connect;
+    }
+    printf("Socket 1 named\n");
+}
+
 int main(int argc, char *argv[]) {
 
     if (argc != 3) { //security : check if the number of arguments is correct
@@ -26,40 +51,19 @@ int main(int argc, char *argv[]) {
 
     printf("Start program\n");
 
-    bool running = true;
+    bool running = true;    
 
-    //Create a function to initialize the sockets  ??
-    int dS1 = socket(PF_INET, SOCK_STREAM, 0); //keep the socket descriptor (id of the socket)
-    printf("Socket 1 created\n");
+    int dS1 = creation_socket();
 
-    int dS2 = socket(PF_INET, SOCK_STREAM, 0); //keep the socket descriptor (id of the socket)
-    printf("Socket 2 created\n");
+    int dS2 = creation_socket();//keep the socket descriptor (id of the socket)
 
-    //Get the adresses of the first Client
-    struct sockaddr_in adresse1;
-    adresse1.sin_family = AF_INET; //address family
-    adresse1.sin_addr.s_addr = INADDR_ANY; //address to accept any incoming messages
-    adresse1.sin_port = htons(atoi(argv[1])); //port passed as argument
+    struct sockaddr_in adresse1 = param_socket_adresse(argv[1]);
 
-    struct sockaddr_in adresse2;
-    adresse2.sin_family = AF_INET; //address family
-    adresse2.sin_addr.s_addr = INADDR_ANY; //address to accept any incoming messages
-    adresse2.sin_port = htons(atoi(argv[2])); //port passed as argument
+    struct sockaddr_in adresse2 = param_socket_adresse(argv[2]);
 
-    int connect = bind(dS1, (struct sockaddr*)&adresse1, sizeof(adresse1)); //variable "connect" to avoid conflict with the function connect
-    if (connect != 0) {
-        printf("Connection error: bind failed\n");
-        return connect;
-    }
-    printf("Socket 1 named\n");
-        
-    int connect1 = bind(dS2, (struct sockaddr*)&adresse2, sizeof(adresse2)); //variable "connect" to avoid conflict with the function connect
-    if (connect1 != 0) {
-        printf("Connection error: bind failed\n");
-        return connect;
-    }
-    printf("Socket 2 named\n");
+    int connect1 = make_bind(dS1,adresse1);
 
+    int connect2 = make_bind(dS2,adresse2);
     /*
     One of the problem is to find who is to konow who is the sender and who is the receiver for the start, given that this is alternante next
     The idea here is that the both clients send their type to be affected the correct role
