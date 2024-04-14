@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 /*
 This program generates client for communication
@@ -52,7 +53,7 @@ int main(int argc, char *argv[]) {
     printf("Socket Connected\n");
 
 
-    bool running = true;
+    int running = 0;
 
 
     char * message = (char *)malloc(sizeof(char) * 301); //Allocation of space for the message 
@@ -60,13 +61,13 @@ int main(int argc, char *argv[]) {
     Here is the loop that run the program,  should be interrupted when the senders type "fin"
     To add : Typing of message in console and end of chat with "fin" word
     */
-    while (running){
+    while (running < 10){
         switch (type) {
             //Sender Case
             case 0:
                 message = malloc(300 * sizeof(char));
-                //fgets(message,300,stdin);
-                message = "Bonjour chef";
+                fgets(message,300,stdin);
+                //message = "Bonjour chef";
                 int checkSend = send(dS, message, 300 , 0) ; // Sending of message to server
                 if (checkSend == -1){
                     perror("Send failed");
@@ -75,7 +76,8 @@ int main(int argc, char *argv[]) {
                 printf("Le message envoye est %s \n", message); //Check of what is the message send
                 printf("Message envoyé \n"); //Confirm of sending
                 //free(message);
-                //type = 1; //Switch type of client
+                running = running+1;
+                type = 1; //Switch type of client
                 break;
             //Receiver Case
             case 1:
@@ -86,17 +88,13 @@ int main(int argc, char *argv[]) {
                     exit(0);
                 }
                 printf("Message recu : %s \n",message);
+                running = running+1;
+                type = 0;
                 break;
         }
-
-        if (type == 1){
-            type = 0;
-        }
-        else {
-            type = 1;
-        }
     }
-    int checkSD = shutdown(dS,2);
+
+    int checkSD = close(dS);
     if (checkSD == -1){
         perror("Shutdown failed");
         exit(0);

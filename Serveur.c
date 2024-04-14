@@ -41,7 +41,7 @@ int make_bind(int socket,struct sockaddr_in adresse) {
 
 int main(int argc, char *argv[]) {
 
-    if (argc != 3) { //security : check if the number of arguments is correct
+    if (argc != 2) { //security : check if the number of arguments is correct
         //printf("Number of arguments incorrect\n");
         perror("Incorrect number of arguments");
         printf("Usage : %s <port>\n", argv[0]);
@@ -93,9 +93,9 @@ int main(int argc, char *argv[]) {
         }
         printf("\n-- Client 2 connected --\n\n");
 
-        int dSClientReceiver = 0;
+        int dSClientReceiver = dSClient2;
 
-        int dSClientSender = 0;
+        int dSClientSender = dSClient1;
 
         printf("Initialisation réussi \n") ;
         
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
         char message[300];
         while (conversation) {
 
-            int res =  recv(dSClientSender, &message, sizeof(char)*300, 0);
+            int res =  recv(dSClientSender, message, sizeof(char)*300, 0);
             if (res < 0) {
                 perror("Error receiving the message");
                 exit(0);
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
                 exit(0);
             }
 
-            if (strcmp(message,"fin")) {
+            if (strcmp(message,"fin")==0) {
                 int fermeture;
                 fermeture = close(dSClient1);
                 if (fermeture < 0) {
