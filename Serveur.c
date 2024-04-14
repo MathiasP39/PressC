@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdbool.h>
 
 
 //Command to launch this program : ./Serveur port
@@ -51,7 +50,7 @@ int main(int argc, char *argv[]) {
 
     printf("Start program\n");
 
-    bool running = true;    
+    short running = 1;    
 
     int dS = creation_socket();
 
@@ -99,7 +98,7 @@ int main(int argc, char *argv[]) {
 
         printf("Initialisation réussi \n") ;
         
-        bool conversation = true;
+        short conversation = 1;
         char message[300];
         while (conversation) {
 
@@ -117,7 +116,7 @@ int main(int argc, char *argv[]) {
 
             if (strcmp(message,"fin")==0) {
                 int fermeture;
-                fermeture = close(dSClient1);
+                fermeture = close(dSClientSender);
                 if (fermeture < 0) {
                     perror("Error when closing dSClient1");
                 }
@@ -125,8 +124,8 @@ int main(int argc, char *argv[]) {
                 if (fermeture < 0) {
                     perror("Error when closing dSClient2");
                 }
-                printf("fin de fermeture \n");
-                conversation = false;
+                printf("Conversation fermé\n");
+                conversation = 0;
             }
             else {
                 int dSechange = dSClientReceiver;

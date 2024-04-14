@@ -9,10 +9,15 @@
 /*
 This program generates client for communication
 Launch it with command : ./Client ip port type (type is 0 for send first and 1 for receive first)
-//Example : ./Client 127.0.0.1 3500 1
-// ./Client 127.0.0.1 3500 0
+//Example : Launch that first : ./Client 127.0.0.1 3500 0 and then ./Client 127.0.0.1 3500 1
 */
 
+char* remove_backslash (char* word) {
+    if (word[strlen(word)-1] == '\n') {
+        word[strlen(word)-1] = '\0';
+    }
+    return word;
+}
 int main(int argc, char *argv[]) {
 
     //Check of number of argument
@@ -20,7 +25,7 @@ int main(int argc, char *argv[]) {
         perror("Incorrect number of arguments");
         exit(0);
     }
-    printf("Program launched\n");
+    //printf("Program launched\n");
 
 
     //Initialization of client type
@@ -37,7 +42,7 @@ int main(int argc, char *argv[]) {
         perror("Socket creation failed");
         exit(0);
     }
-    printf("Socket Created\n");
+    //printf("Socket Created\n");
 
     //Socket connection
     struct sockaddr_in aS;
@@ -50,45 +55,50 @@ int main(int argc, char *argv[]) {
         perror("Connection failed");
         exit(0);
     }
-    printf("Socket Connected\n");
-
-
-    int running = 0;
-
-
-    char * message = (char *)malloc(sizeof(char) * 301); //Allocation of space for the message 
+    //printf("Socket Connected\n");
+    int running = 1;
+    char * message = (char *)malloc(sizeof(char) * 301); //Allocation of space for the message, send or receive, did that their to not reaollocate at each time cause it is not performant
     /*
     Here is the loop that run the program,  should be interrupted when the senders type "fin"
-    To add : Typing of message in console and end of chat with "fin" word
     */
-    while (running < 10){
+    while (running){
         switch (type) {
             //Sender Case
             case 0:
-                message = malloc(300 * sizeof(char));
+                printf("Veuillez écricre le message a envoyé : ");
                 fgets(message,300,stdin);
-                //message = "Bonjour chef";
-                int checkSend = send(dS, message, 300 , 0) ; // Sending of message to server
+                message = remove_backslash(message);
+                int checkSend = send(dS, message, 300 , 0); // Sending of message to server
                 if (checkSend == -1){
                     perror("Send failed");
                     exit(0);
                 }
-                printf("Le message envoye est %s \n", message); //Check of what is the message send
-                printf("Message envoyé \n"); //Confirm of sending
-                //free(message);
-                running = running+1;
+                
+                if (strcmp(message,"fin") == 0){
+                    running = 0;
+                    printf("You decided to end the conversation, you and your contact will be deconnected \n");
+                }
+                else {
+                    printf("Le message envoye est %s \n", message); //Check of what is the message send
+                }
                 type = 1; //Switch type of client
                 break;
             //Receiver Case
             case 1:
-                //char * message = (char *)malloc(sizeof(char) * 301); //Allocation of space for the message 
                 int checkReceive = recv(dS, message, 300, 0); //Reception of message
+
                 if (checkReceive == -1){
                     perror("Receive failed");
                     exit(0);
                 }
-                printf("Message recu : %s \n",message);
-                running = running+1;
+
+                if (strcmp(message,"fin") == 0){
+                    running = 0;
+                    printf("Your contact has ended the chat, you will be deconnected \n");
+                }
+                else {
+                    printf("Message recu : %s \n",message);
+                }
                 type = 0;
                 break;
         }
