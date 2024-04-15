@@ -97,12 +97,15 @@ int main(int argc, char *argv[]) {
         int dSClientSender = dSClient1;
 
         printf("Initialisation réussi \n") ;
-        
+        printf("la");
         short conversation = 1;
+        printf("la2");
         char message[300];
+        printf("la4");
         while (conversation) {
-
+            printf("En attente d'un message");
             int res =  recv(dSClientSender, message, sizeof(char)*300, 0);
+            printf("message recu : %s",message);
             if (res < 0) {
                 perror("Error receiving the message");
                 exit(0);
