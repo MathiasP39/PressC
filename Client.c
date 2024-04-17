@@ -96,56 +96,9 @@ int main(int argc, char *argv[]) {
     int i = pthread_create (&tid, NULL, message_reception,&dS);
     int j = pthread_create(&tid2,NULL,message_sending,&dS);
 
+    pthread_join(tid,NULL);
+    pthread_join(tid2,NULL);
 
-    int running = 1;
-    //char * message = (char *)malloc(sizeof(char) * 301); //Allocation of space for the message, send or receive, did that their to not reaollocate at each time cause it is not performant
-    /*
-    Here is the loop that run the program,  should be interrupted when the senders type "fin"
-    */
-    while (running){
-        /*
-        switch (type) {
-            //Sender Case
-            case 0:
-                printf("Veuillez écricre le message a envoyé : ");
-                fgets(message,300,stdin);
-                message = remove_backslash(message);
-                int checkSend = send(dS, message, 300 , 0); // Sending of message to server
-                if (checkSend == -1){
-                    perror("Send failed");
-                    exit(0);
-                }
-                
-                if (strcmp(message,"fin") == 0){
-                    running = 0;
-                    printf("You decided to end the conversation, you and your contact will be deconnected \n");
-                }
-                else {
-                    printf("Le message envoye est %s \n", message); //Check of what is the message send
-                }
-                type = 1; //Switch type of client
-                break;
-            //Receiver Case
-            case 1:
-                int checkReceive = recv(dS, message, 300, 0); //Reception of message
-
-                if (checkReceive == -1){
-                    perror("Receive failed");
-                    exit(0);
-                }
-
-                if (strcmp(message,"fin") == 0){
-                    running = 0;
-                    printf("Your contact has ended the chat, you will be deconnected \n");
-                }
-                else {
-                    printf("Message recu : %s \n",message);
-                }
-                type = 0;
-                break;
-        }
-        */
-    }
 
     int checkSD = close(dS);
     if (checkSD == -1){
