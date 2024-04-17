@@ -9,9 +9,15 @@
 /*
 This program generates client for communication
 Launch it with command : ./Client ip port
-//Example : Launch that first : ./Client 127.0.0.1 3500 and then ./Client 127.0.0.1 3500
+//Example : Launch : ./Client 127.0.0.1 3500 and then ./Client 127.0.0.1 3500
 */
 
+/*
+Function that removes the backslash n at the end of a string (char[])
+Take the pointer to the first character
+Return the word without the characyer or just the word if there isn't
+Use here to remove it from the fget input
+*/
 char* remove_backslash (char* word) {
     if (word[strlen(word)-1] == '\n') {
         word[strlen(word)-1] = '\0';
@@ -19,27 +25,37 @@ char* remove_backslash (char* word) {
     return word;
 }
 
+/*
+Function that is used to recep message from another client coming through the server
+Supposed to be used in a thread unless you just want to receip
+Needs the id of the socket to the server in argument
+Return 0 if all went good and -1 if there was an error
+*/
 void* message_reception (void * args) {
     int * dS = (int*) args;
-    printf("dS vaut : %d \n",*dS);
     int running = 1;
     char * message = (char *)malloc(sizeof(char) * 301);
     while (running) {
         int checkReceive = recv(*dS, message, 300, 0); //Reception of message
         if (checkReceive == -1){
             perror("Receive failed");
-            exit(0);
+            exit(-1);
         }
         puts(message);
-        sleep(1);
+        sleep(0.1);
     }
     pthread_exit(0); 
 }
 
+/*
+Function that is used to ensure the sending of message to the server
+Supposed to be used in a thread
+The id of the socket used is required in argument 
+Return 0 if it succeed, -1 if an error occured
+*/
 void* message_sending (void * args) {
     //printf("Entrée dans la fonction d'envoie de message");
     int* dS = (int*) args;
-    printf("dS vaut : %d \n",*dS);
     char * message = (char *)malloc(sizeof(char) * 301);
     int running = 1;
     while (running) {
@@ -48,15 +64,35 @@ void* message_sending (void * args) {
         int checkSend = send(*dS, message, 300 , 0); // Sending of message to server
         if (checkSend == -1){
             perror("Send failed");
-            exit(0);
+            exit(-1);
         }
         else {
-            puts("le message enoyé est : ");
-            puts(message);
+            //puts("le message envoyé");
+            //puts(message);
         }
         sleep(1);
     }
     pthread_exit(0);
+}
+
+/*
+Function that connect the socket to the other which is located at the ip and port 
+You need to give the ip, the port and the id
+Return 0 if all went good 
+*/
+int socket_connection (char * ip, char* port,int socket_id) {
+    //Socket connection
+    struct sockaddr_in aS;
+    aS.sin_family = AF_INET;
+    inet_pton(AF_INET,ip,&(aS.sin_addr));
+    aS.sin_port = htons(atoi(port));
+    socklen_t lgA = sizeof(struct sockaddr_in);
+    int checkConnect = connect(socket_id, (struct sockaddr *) &aS, lgA);
+    if (checkConnect == -1){
+        perror("Connection failed");
+        exit(-1);
+    }
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -66,7 +102,6 @@ int main(int argc, char *argv[]) {
         perror("Incorrect number of arguments");
         exit(0);
     }
-    //printf("Program launched\n");
 
     //Socket creation
     int dS = socket(PF_INET, SOCK_STREAM, 0);
@@ -74,28 +109,17 @@ int main(int argc, char *argv[]) {
         perror("Socket creation failed");
         exit(0);
     }
-    //printf("Socket Created\n");
 
     //Socket connection
-    struct sockaddr_in aS;
-    aS.sin_family = AF_INET;
-    inet_pton(AF_INET,argv[1],&(aS.sin_addr));
-    aS.sin_port = htons(atoi(argv[2]));
-    socklen_t lgA = sizeof(struct sockaddr_in);
-    int checkConnect = connect(dS, (struct sockaddr *) &aS, lgA);
-    if (checkConnect == -1){
-        perror("Connection failed");
-        exit(0);
-    }
+    socket_connection(argv[1],argv[2],dS);
 
     pthread_t tid;
     pthread_t tid2;
 
-    printf("dS vaut : %d \n",dS);
-
     int i = pthread_create (&tid, NULL, message_reception,&dS);
     int j = pthread_create(&tid2,NULL,message_sending,&dS);
 
+    //Waiting for the close of the 2 threads 
     pthread_join(tid,NULL);
     pthread_join(tid2,NULL);
 

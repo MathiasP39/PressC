@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
         while (conversation) {
             printf("En attente d'un message \n");
             int res =  recv(dSClientSender, message, sizeof(char)*300, 0);
-            printf("message recu : %s",message);
+            printf("message recu : %s \n",message);
             if (res < 0) {
                 perror("Error receiving the message");
                 exit(0);
