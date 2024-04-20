@@ -125,7 +125,6 @@ void * get_client (void * arg ) {
 int main(int argc, char *argv[]) {
 
     if (argc != 2) { //security : check if the number of arguments is correct
-        //printf("Number of arguments incorrect\n");
         perror("Incorrect number of arguments");
         printf("Usage : %s <port>\n", argv[0]);
         exit(0);
@@ -133,7 +132,7 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Start program\n");
-
+    //There is the const that define the maximum the number of client handled by the server
     const int NB_CLIENT_MAX = 100;
 
     short running = 1;    
@@ -169,6 +168,7 @@ int main(int argc, char *argv[]) {
         struct sockaddr_in aC1 ;
         struct sockaddr_in aC2 ;
 
+        //The conversation start when at least to client are connected 
         tab_client[0] = connect_to_client(aC1,dS);
         tab_client[1] = connect_to_client(aC2,dS);
 
@@ -180,10 +180,12 @@ int main(int argc, char *argv[]) {
         struct thread_argument arg2 = {tab_client[1],tab_client};
 
         printf("Initialisation réussi \n") ;
+        
 
         int i = pthread_create (&tid, NULL, discussion,&arg1);
         int j = pthread_create(&tid2,NULL,discussion,&arg2);
 
+        //Creating the thread that will handle the connection of new client 
         struct arg_get_client arg_client = {tab_client,NB_CLIENT_MAX,dS};
 
         int k = pthread_create(&thread_add_client,NULL,get_client,&arg_client);
@@ -191,6 +193,5 @@ int main(int argc, char *argv[]) {
         //Waiting for the close of the 2 threads 
         pthread_join(tid,NULL);
         pthread_join(tid2,NULL);
-
 }
 }

@@ -9,7 +9,7 @@
 /*
 This program generates client for communication
 Launch it with command : ./Client ip port
-//Example : Launch : ./Client 127.0.0.1 3500 and then ./Client 127.0.0.1 3500
+//Example : Launch : ./Client 127.0.0.1 3500 for each client 
 */
 
 /*
@@ -54,7 +54,6 @@ The id of the socket used is required in argument
 Return 0 if it succeed, -1 if an error occured
 */
 void* message_sending (void * args) {
-    //printf("Entrée dans la fonction d'envoie de message");
     int* dS = (int*) args;
     char * message = (char *)malloc(sizeof(char) * 301);
     int running = 1;
@@ -65,10 +64,6 @@ void* message_sending (void * args) {
         if (checkSend == -1){
             perror("Send failed");
             exit(-1);
-        }
-        else {
-            //puts("le message envoyé");
-            //puts(message);
         }
         sleep(1);
     }
