@@ -60,6 +60,14 @@ int connect_to_client (struct sockaddr_in adress, int descripteur) {
     return dSClient;
 }
 
+void send_all(int socket_sender, char *message, int *tab_client) {
+    for (int i = 0; tab[i] != -1; i++) {
+        if (tab_client[i] != socket_sender) {
+            send(tab_client, message, sizeof(char)*300, 0);
+        }
+    }
+}
+
 void * discussion (void * arg) {
     struct thread_argument * argument = (struct thread_argument *) arg;
     short conversation = 1;
@@ -79,7 +87,8 @@ void * discussion (void * arg) {
                 exit(0);
         }
 
-        res = send(receiver, message, sizeof(char)*300 , 0);
+        send_all(argument->descripteur, message, tab_client)
+        //res = send(receiver, message, sizeof(char)*300 , 0);
         if (res < 0) {
             perror("Error sending the message");
             exit(0);
