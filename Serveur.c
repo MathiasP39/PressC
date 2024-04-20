@@ -79,8 +79,12 @@ void * discussion (void * arg) {
             exit(0);
         }
         sleep(0.01);
+    }
 }
-}
+
+void * get_client (void * arg ) {
+    
+} 
 
 int main(int argc, char *argv[]) {
 
@@ -94,6 +98,8 @@ int main(int argc, char *argv[]) {
 
     printf("Start program\n");
 
+    const int NB_CLIENT_MAX = 100;
+
     short running = 1;    
 
     int dS = creation_socket();
@@ -102,7 +108,14 @@ int main(int argc, char *argv[]) {
 
     int connect = make_bind(dS,adresse);
 
-    int tab_client[2]; 
+    int tab_client[NB_CLIENT_MAX];
+
+    int ecoute = listen(dS,1);
+    if (ecoute < 0) {
+        perror("Connection error: listen failed\n");
+        return ecoute;
+    }
+    printf("Listening mode\n");
 
     /*
     One of the problem is to find who is to konow who is the sender and who is the receiver for the start, given that this is alternante next
