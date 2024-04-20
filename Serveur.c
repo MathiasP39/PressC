@@ -61,9 +61,9 @@ int connect_to_client (struct sockaddr_in adress, int descripteur) {
 }
 
 void send_all(int socket_sender, char *message, int *tab_client) {
-    for (int i = 0; tab[i] != -1; i++) {
+    for (int i = 0; tab_client[i] != -1; i++) {
         if (tab_client[i] != socket_sender) {
-            send(tab_client, message, sizeof(char)*300, 0);
+            send(tab_client[i], message, sizeof(char)*300, 0);
         }
     }
 }
@@ -72,13 +72,6 @@ void * discussion (void * arg) {
     struct thread_argument * argument = (struct thread_argument *) arg;
     short conversation = 1;
     char message[300];
-    int receiver;
-    if (argument->tab_of_client[0] == argument->descripteur) {
-        receiver = argument->tab_of_client[1];
-    }
-    else {
-        receiver = argument->tab_of_client[0];
-    }
     while (conversation) {
         int res =  recv(argument->descripteur, message, sizeof(char)*300, 0);
         printf("message recu : %s \n",message);
@@ -87,7 +80,7 @@ void * discussion (void * arg) {
                 exit(0);
         }
 
-        send_all(argument->descripteur, message, tab_client)
+        send_all(argument->descripteur, message, argument->tab_of_client);
         //res = send(receiver, message, sizeof(char)*300 , 0);
         if (res < 0) {
             perror("Error sending the message");
