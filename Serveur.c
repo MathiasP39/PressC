@@ -18,12 +18,19 @@ struct thread_argument {
     int* tab_of_client;
 };
 
+/*
+Function to create a socket 
+Return the descriptor
+*/
 int creation_socket() {
         int dS = socket(PF_INET, SOCK_STREAM, 0);
         printf("Socket created \n");
         return dS;
 }
 
+/*
+Function that get us a basic socket adress at the port in parameter
+*/
 struct sockaddr_in param_socket_adresse(char * port) {
     //Get the adresses of the first Client
     struct sockaddr_in adresse1;
@@ -34,6 +41,9 @@ struct sockaddr_in param_socket_adresse(char * port) {
     return adresse1;
 }
 
+/*
+Fonction qui nomme notre socket
+*/
 int make_bind(int socket,struct sockaddr_in adresse) {
     int connect = bind(socket,(struct sockaddr*)&adresse,sizeof(adresse)); //variable "connect" to avoid conflict with the function connect
     if (connect != 0) {
@@ -43,6 +53,9 @@ int make_bind(int socket,struct sockaddr_in adresse) {
     printf("Socket named\n");
 }
 
+/*
+Function that permit to get a client connected
+*/
 int connect_to_client (struct sockaddr_in adress, int descripteur) {
     socklen_t lenght = sizeof(struct sockaddr_in); //keep the length of the address
     int dSClient = accept(descripteur, (struct sockaddr*) &adress, &lenght); //keep the (new) socket descriptor of the client
@@ -53,26 +66,32 @@ int connect_to_client (struct sockaddr_in adress, int descripteur) {
     printf("\n-- Client connected --\n");
     return dSClient;
 }
-
+/*
+Function that take a tread argument in entry
+This thread argument contain the client that we will handling the message reception and the sending to the other
+*/
 void * discussion (void * arg) {
-    struct thread_argument * argument = (struct thread_argument *) arg;
+    struct thread_argument * argument = (struct thread_argument *) arg; //Cast of the argument
     short conversation = 1;
-    char message[300];
+    char message[300]; //Allocation of memory for the message
     int receiver;
+    //Here we want to know in which position is the receiver in the client tab
     if (argument->tab_of_client[0] == argument->descripteur) {
         receiver = argument->tab_of_client[1];
     }
     else {
         receiver = argument->tab_of_client[0];
     }
+    //Loop that handle the process
     while (conversation) {
+        //This function get the function blocked as long as there is no message received
         int res =  recv(argument->descripteur, message, sizeof(char)*300, 0);
         printf("message recu : %s \n",message);
         if (res < 0) {
             perror("Error receiving the message");
                 exit(0);
         }
-
+        //resending to the other client
         res = send(receiver, message, sizeof(char)*300 , 0);
         if (res < 0) {
             perror("Error sending the message");
@@ -105,14 +124,12 @@ int main(int argc, char *argv[]) {
     int tab_client[2]; 
 
     /*
-    One of the problem is to find who is to konow who is the sender and who is the receiver for the start, given that this is alternante next
-    The idea here is that the both clients send their type to be affected the correct role
+    This is loop is used for functionnal message server
+    This ensure that we have 2 clients and launch the 2 threads that make the communication possible
     */
-   //The part above is 
-   //This loop should be running unless there is an external interruption, because this allow to handle the connection of new Clients when the last conversation has ended
     while (running) {
 
-        int ecoute = listen(dS,1);
+        int ecoute = listen(dS,1);//Getting the socket to receive connection request
         if (ecoute < 0) {
             perror("Connection error: listen failed\n");
             return ecoute;
@@ -122,12 +139,16 @@ int main(int argc, char *argv[]) {
         struct sockaddr_in aC1 ;
         struct sockaddr_in aC2 ;
 
-        tab_client[0] = connect_to_client(aC1,dS);
-        tab_client[1] = connect_to_client(aC2,dS);
+        tab_client[0] = connect_to_client(aC1,dS);//Connecting the first client
+        tab_client[1] = connect_to_client(aC2,dS);//Connecting the second one
 
         pthread_t tid;
         pthread_t tid2;
 
+        /*
+        Here we have the 2 arguments that would be passed to the thread to handle the two sided communication
+        We provide the sender and the tab of client to know to who we gonna send
+        */
         struct thread_argument arg1 = {tab_client[0],tab_client};
         struct thread_argument arg2 = {tab_client[1],tab_client};
 
