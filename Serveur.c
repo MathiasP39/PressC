@@ -18,6 +18,12 @@ struct thread_argument {
     int* tab_of_client;
 };
 
+struct arg_get_client {
+        int* tab_client;
+        int Nb_client_max;
+        int dS;
+};
+
 int creation_socket() {
         int dS = socket(PF_INET, SOCK_STREAM, 0);
         printf("Socket created \n");
@@ -82,8 +88,36 @@ void * discussion (void * arg) {
     }
 }
 
+int add_client (int * tab_client,int size,int dS) {
+    int res = -1;
+    int i = 0;
+    while (res == -1 && i<size){
+        if (tab_client[i] == -1) {
+            tab_client[i] = dS;
+            res = 0;
+        }
+        ++i;
+    }
+    return res;
+}
+
 void * get_client (void * arg ) {
-    
+    struct arg_get_client *args = (struct arg_get_client *) arg;
+    while (1) {
+        struct sockaddr_in aC ;
+        int dSClient = connect_to_client(aC,args->dS);
+        int res = add_client(args->tab_client,args->Nb_client_max,dSClient);
+        if (res == -1) {
+            char message[] = "You can't connect there is already too many people connected, retry later";
+            send(dSClient, message, sizeof(message) , 0);
+        close(dSClient);
+        }
+        else if (res == 0) {
+            pthread_t tid;
+            struct thread_argument arg = {dSClient,args->tab_client};
+            int i = pthread_create (&tid, NULL, discussion,&arg);
+        }
+    }
 } 
 
 int main(int argc, char *argv[]) {
@@ -110,12 +144,18 @@ int main(int argc, char *argv[]) {
 
     int tab_client[NB_CLIENT_MAX];
 
+    //Initialisation of all value of the tab
+    for (int i = 0; i<NB_CLIENT_MAX; ++i) {
+        tab_client[i] = -1;
+    }
+
     int ecoute = listen(dS,1);
     if (ecoute < 0) {
         perror("Connection error: listen failed\n");
         return ecoute;
     }
     printf("Listening mode\n");
+
 
     /*
     One of the problem is to find who is to konow who is the sender and who is the receiver for the start, given that this is alternante next
@@ -124,14 +164,6 @@ int main(int argc, char *argv[]) {
    //The part above is 
    //This loop should be running unless there is an external interruption, because this allow to handle the connection of new Clients when the last conversation has ended
     while (running) {
-
-        int ecoute = listen(dS,1);
-        if (ecoute < 0) {
-            perror("Connection error: listen failed\n");
-            return ecoute;
-        }
-        printf("Listening mode\n");
-
         struct sockaddr_in aC1 ;
         struct sockaddr_in aC2 ;
 
@@ -140,6 +172,7 @@ int main(int argc, char *argv[]) {
 
         pthread_t tid;
         pthread_t tid2;
+        pthread_t thread_add_client;
 
         struct thread_argument arg1 = {tab_client[0],tab_client};
         struct thread_argument arg2 = {tab_client[1],tab_client};
@@ -148,6 +181,10 @@ int main(int argc, char *argv[]) {
 
         int i = pthread_create (&tid, NULL, discussion,&arg1);
         int j = pthread_create(&tid2,NULL,discussion,&arg2);
+
+        struct arg_get_client arg_client = {tab_client,NB_CLIENT_MAX,dS};
+
+        int k = pthread_create(&thread_add_client,NULL,get_client,&arg_client);
 
         //Waiting for the close of the 2 threads 
         pthread_join(tid,NULL);
