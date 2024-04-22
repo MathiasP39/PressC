@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include "utilitaire.h"
 
 
 //Command to launch this program : ./Serveur port
@@ -114,7 +115,7 @@ int connect_to_client(struct sockaddr_in adress, int descripteur) {
 void send_all(int socket_sender, char *message, int *tab_client) {
     for (int i = 0; tab_client[i] != -1; i++) {
         if (tab_client[i] != socket_sender) {
-            send(tab_client[i], message, sizeof(char)*300, 0);
+            send_message(tab_client[i], message);
         }
     }
 }
@@ -129,17 +130,16 @@ void send_all(int socket_sender, char *message, int *tab_client) {
 void * discussion (void * arg) {
     struct thread_argument * argument = (struct thread_argument *) arg;
     short conversation = 1;
-    char message[300];
+    char *message;
     while (conversation) {
-        int res =  recv(argument->descripteur, message, sizeof(char)*300, 0);
+        int res =  recv_message(argument->descripteur, &message);
         printf("message recu : %s \n",message);
         if (res < 0) {
             perror("Error receiving the message");
-                exit(0);
+            exit(0);
         }
 
         send_all(argument->descripteur, message, argument->tab_of_client);
-        //res = send(receiver, message, sizeof(char)*300 , 0);
         if (res < 0) {
             perror("Error sending the message");
             exit(0);
@@ -218,7 +218,7 @@ int main(int argc, char *argv[]) {
 
     printf("Start program\n");
     //There is the const that define the maximum the number of client handled by the server
-    const int NB_CLIENT_MAX = 100;
+    const int NB_CLIENT_MAX = 10;
 
     short running = 1;    
 

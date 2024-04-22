@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include "utilitaire.h"
 
 /*
 This program generates client for communication
@@ -34,17 +35,13 @@ Return 0 if all went good and -1 if there was an error
 void* message_reception (void * args) {
     int * dS = (int*) args;
     int running = 1;
-    char * message = (char *)malloc(sizeof(char) * 301);
+    char * message;
     while (running) {
-        int checkReceive = recv(*dS, message, 300, 0); //Reception of message
-        if (checkReceive == -1){
-            perror("Receive failed");
-            exit(-1);
-        }
+        int checkReceive = recv_message(*dS, &message); //Reception of message
         puts(message);
         sleep(0.1);
     }
-    pthread_exit(0); 
+    pthread_exit(0);
 }
 
 /*
@@ -60,12 +57,13 @@ void* message_sending (void * args) {
     while (running) {
         fgets(message,300,stdin);
         message = remove_backslash(message);
-        int checkSend = send(*dS, message, 300 , 0); // Sending of message to server
+        int checkSend = send_message(*dS, message); // Sending of message to server
         if (checkSend == -1){
             perror("Send failed");
             exit(-1);
         }
-        sleep(1);
+
+        sleep(0.1);
     }
     pthread_exit(0);
 }
