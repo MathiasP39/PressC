@@ -64,7 +64,7 @@ int connect_to_client (struct sockaddr_in adress, int descripteur) {
 void send_all(int socket_sender, char *message, int *tab_client) {
     for (int i = 0; tab_client[i] != -1; i++) {
         if (tab_client[i] != socket_sender) {
-            send(tab_client[i], message, sizeof(char)*300, 0);
+            send_message(tab_client[i], message);
         }
     }
 }
