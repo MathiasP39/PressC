@@ -82,6 +82,7 @@ int make_bind(int socket, struct sockaddr_in adresse) {
         return connect;
     }
     printf("Socket named\n");
+    return connect;
 }
 
 /**
@@ -112,12 +113,17 @@ int connect_to_client(struct sockaddr_in adress, int descripteur) {
  * @param message The message to send.
  * @param tab_client The array of client socket descriptors.
  */
-void send_all(int socket_sender, char *message, int *tab_client) {
-    for (int i = 0; tab_client[i] != -1; i++) {
-        if (tab_client[i] != socket_sender) {
-            send_message(tab_client[i], message);
+int send_all(int socket_sender, char *message, int *tab_client) {
+    for (int i = 0; i<10; i++) {
+        printf("La valeur du descripteur dest est : %d",tab_client[i]);
+        if (tab_client[i] != -1 && tab_client[i] != socket_sender) {
+            int res = send_message(tab_client[i], message);
+            if (res < 0) {
+                perror("Error sending the message");
+            }
         }
     }
+    return 0;
 }
 
 /**
@@ -138,8 +144,7 @@ void * discussion (void * arg) {
             perror("Error receiving the message");
             exit(0);
         }
-
-        send_all(argument->descripteur, message, argument->tab_of_client);
+        res = send_all(argument->descripteur, message, argument->tab_of_client);
         if (res < 0) {
             perror("Error sending the message");
             exit(0);
@@ -168,6 +173,7 @@ int add_client(int *tab_client, int size, int dS) {
         }
         ++i;
     }
+    printf("Fin ajout client");
     return res;
 }
 
@@ -189,7 +195,7 @@ void * get_client (void * arg ) {
         int res = add_client(args->tab_client,args->Nb_client_max,dSClient);
         if (res == -1) {
             char message[] = "You can't connect there is already too many people connected, retry later";
-            send(dSClient, message, sizeof(message) , 0);
+            send_message(dSClient, message);
             close(dSClient);
         }
         else if (res == 0) {
@@ -268,6 +274,8 @@ int main(int argc, char *argv[]) {
     //Waiting for the close of the thread
 
     pthread_join(thread_add_client,NULL);
+
+    printf("Fin du programme");
 
     close(dS);
 
