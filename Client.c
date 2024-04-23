@@ -38,7 +38,17 @@ void* message_reception (void * args) {
     char * message;
     while (running) {
         int checkReceive = recv_message(*dS, &message); //Reception of message
-        puts(message);
+        if (checkReceive < 0) {
+            perror("Error receiving message");
+        }
+        else if (checkReceive == 0) {
+            puts("Connection disconnected");
+            close(*dS);
+            exit(EXIT_SUCCESS);
+        }
+        else {
+            puts(message);
+        }
         sleep(0.1);
     }
     pthread_exit(0);
@@ -60,7 +70,7 @@ void* message_sending (void * args) {
         int checkSend = send_message(*dS, message); // Sending of message to server
         if (checkSend == -1){
             perror("Send failed");
-            exit(-1);
+            exit(EXIT_FAILURE);
         }
 
         sleep(0.1);

@@ -78,7 +78,7 @@ struct sockaddr_in param_socket_adresse(char *port) {
 int make_bind(int socket, struct sockaddr_in adresse) {
     int connect = bind(socket, (struct sockaddr*)&adresse, sizeof(adresse)); //variable "connect" to avoid conflict with the function connect
     if (connect != 0) {
-        printf("Connection error: bind failed\n");
+        perror("Connection error: bind failed\n");
         return connect;
     }
     printf("Socket named\n");
@@ -115,7 +115,6 @@ int connect_to_client(struct sockaddr_in adress, int descripteur) {
  */
 int send_all(int socket_sender, char *message, int *tab_client) {
     for (int i = 0; i<10; i++) {
-        printf("La valeur du descripteur dest est : %d",tab_client[i]);
         if (tab_client[i] != -1 && tab_client[i] != socket_sender) {
             int res = send_message(tab_client[i], message);
             if (res < 0) {
@@ -137,14 +136,15 @@ void * discussion (void * arg) {
     struct thread_argument * argument = (struct thread_argument *) arg;
     short conversation = 1;
     char *message;
+    int dS = argument->descripteur;
     while (conversation) {
-        int res =  recv_message(argument->descripteur, &message);
+        int res =  recv_message(dS, &message);
         printf("message recu : %s \n",message);
         if (res < 0) {
             perror("Error receiving the message");
             exit(0);
         }
-        res = send_all(argument->descripteur, message, argument->tab_of_client);
+        res = send_all(dS, message, argument->tab_of_client);
         if (res < 0) {
             perror("Error sending the message");
             exit(0);
@@ -173,7 +173,6 @@ int add_client(int *tab_client, int size, int dS) {
         }
         ++i;
     }
-    printf("Fin ajout client");
     return res;
 }
 
@@ -200,8 +199,8 @@ void * get_client (void * arg ) {
         }
         else if (res == 0) {
             pthread_t tid;
-            struct thread_argument arg = {dSClient,args->tab_client};
-            int i = pthread_create (&tid, NULL, discussion, &arg);
+            struct thread_argument argument = {dSClient,args->tab_client};
+            int i = pthread_create (&tid, NULL, discussion, &argument);
         }
     }
 } 
