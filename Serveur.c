@@ -5,6 +5,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <sys/ipc.h>
+//#include <sys/types.h>
+#include <sys/sem.h>
 #include "utilitaire.h"
 
 
@@ -125,6 +128,19 @@ int send_all(int socket_sender, char *message, int *tab_client) {
     return 0;
 }
 
+int delete_client (int dS, int* tab_of_client) {
+    int res = -1;
+    int i = 0;
+    while (res == -1) {
+        if (tab_of_client[i] == dS) {
+            tab_of_client[i] = -1;
+            res = 0;
+        }
+        i = i+1;
+    }
+    return res;
+}
+
 /**
  * Handles the conversation between two clients.
  * 
@@ -182,18 +198,6 @@ int add_client(int *tab_client, int size, int dS) {
     return res;
 }
 
-int delete_client (int dS, int* tab_of_client) {
-    int res = -1;
-    int i = 0;
-    while (res == -1) {
-        if (tab_of_client[i] == dS) {
-            tab_of_client[i] = -1;
-            res = 0;
-        }
-        i = i+1;
-    }
-    return res;
-}
 
 /**
  * Gets a client connection.
@@ -260,6 +264,10 @@ int main(int argc, char *argv[]) {
     }
 
     int tab_client[NB_CLIENT_MAX];
+
+    int cleSem = ftok("cle_sem.txt", 'r'); 
+
+    int idSem = semget(cleSem, 1,0666);
 
     //Initialisation of all value of the tab
     for (int i = 0; i<NB_CLIENT_MAX; ++i) {
