@@ -157,7 +157,7 @@ int delete_client (int dS, int* tab_of_client,int semaphore) {
  */
 void * discussion (void * arg) {
     struct thread_argument * argument = (struct thread_argument *) arg;
-    short conversation = 1;
+    int conversation = 1;
     char *message;
     int dS = argument->descripteur;
     while (conversation) {
@@ -174,10 +174,17 @@ void * discussion (void * arg) {
             exit(0);
         }
         else {
+            if  (strcmp(message,"fin") == 0) {
+                puts("Deconnexion du Client");
+                delete_client(dS,argument->tab_of_client,argument->semaphore_id);
+                close(dS);
+                conversation = 0;
+            }
             res = send_all(dS, message, argument->tab_of_client,argument->semaphore_id,argument->Nb_client_max); 
         }
         sleep(0.01);
     }
+    pthread_exit(0);
 }
 
 /**

@@ -71,7 +71,10 @@ void* message_sending (void * args) {
             perror("Send failed");
             exit(EXIT_FAILURE);
         }
-
+        if (strcmp(message,"fin") == 0) {
+            puts("Deconnexion de la discussion");
+            running = 0;
+        }
         sleep(0.1);
     }
     pthread_exit(0);
