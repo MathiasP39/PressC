@@ -140,6 +140,12 @@ void * discussion (void * arg) {
     while (conversation) {
         int res =  recv_message(dS, &message);
         printf("message recu : %s \n",message);
+        if (res == 0) {
+            puts("Deconnexion d'un client");
+            int resultat = delete_client(dS,argument->tab_of_client);
+            close(dS);
+            pthread_exit(NULL);
+        }
         if (res < 0) {
             perror("Error receiving the message");
             exit(0);
@@ -172,6 +178,19 @@ int add_client(int *tab_client, int size, int dS) {
             res = 0;
         }
         ++i;
+    }
+    return res;
+}
+
+int delete_client (int dS, int* tab_of_client) {
+    int res = -1;
+    int i = 0;
+    while (res == -1) {
+        if (tab_of_client[i] == dS) {
+            tab_of_client[i] = -1;
+            res = 0;
+        }
+        i = i+1;
     }
     return res;
 }

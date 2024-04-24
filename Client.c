@@ -43,8 +43,7 @@ void* message_reception (void * args) {
         }
         else if (checkReceive == 0) {
             puts("Connection disconnected");
-            close(*dS);
-            exit(EXIT_SUCCESS);
+            pthread_exit(0);
         }
         else {
             puts(message);
@@ -122,14 +121,13 @@ int main(int argc, char *argv[]) {
     int i = pthread_create (&tid, NULL, message_reception,&dS);
     int j = pthread_create(&tid2,NULL,message_sending,&dS);
 
-    //Waiting for the close of the 2 threads 
-    pthread_join(tid,NULL);
-    pthread_join(tid2,NULL);
-
-
-    int checkSD = close(dS);
-    if (checkSD == -1){
-        perror("Shutdown failed");
-        exit(0);
+    if (pthread_join(tid,NULL) == 0 || pthread_join(tid2,NULL) == 0) {
+        int checkSD = close(dS);
+        if (checkSD == -1){
+            perror("Shutdown failed");
+        } 
+        else {
+            exit(0);
+        }
     }
 }
