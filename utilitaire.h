@@ -10,4 +10,8 @@ int send_message (int descripteur, char* message);
 
 int recv_message(int descripteur,char ** message);
 
+int semaphore_unlock (int sem);
+
+int semaphore_wait (int sem);
+
 #endif

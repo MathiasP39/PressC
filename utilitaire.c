@@ -1,4 +1,7 @@
 #include "utilitaire.h"
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
 //A debugger
 
@@ -35,4 +38,24 @@ int recv_message(int descripteur,char** message) {
         return res; //Return of error code
     }
     return 1; //All went good
+}
+
+int semaphore_wait (int sem) {
+    struct sembuf waiting_buffer;
+    waiting_buffer.sem_num = 0;
+    waiting_buffer.sem_op = -1;
+    waiting_buffer.sem_flg = 0;
+    if (semop(sem,&waiting_buffer,1) == 0) {
+        return 0;
+    }
+}
+
+int semaphore_unlock (int sem) {
+    struct sembuf unlocking_buffer;
+    unlocking_buffer.sem_num = 0;
+    unlocking_buffer.sem_op = 1;
+    unlocking_buffer.sem_flg = 0;
+    if (semop(sem,&unlocking_buffer,1) == 0){
+        return 0;
+    }
 }
