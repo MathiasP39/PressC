@@ -136,7 +136,7 @@ int send_all(int socket_sender, char *message, int *tab_client,int semaphore,int
 /**
  * Deletes a client from the client array.
  * 
- * This function searches for the client socket descriptor in the client array and deletes it.
+ * This function searches for the client socket descriptor in the client array and deletes it. It deletes by setting the value of the client socket descriptor to -1.
  * 
  * @param dS The client socket descriptor to delete.
  * @param tab_of_client The array of client socket descriptors.
@@ -145,7 +145,12 @@ int send_all(int socket_sender, char *message, int *tab_client,int semaphore,int
 int delete_client (int dS, int* tab_of_client,int semaphore) {
     int res = -1;
     int i = 0;
-    semaphore_wait(semaphore);
+    int waitCheck = semaphore_wait(semaphore); //wait for the semaphore to be available
+    if (waitCheck == -1) {
+        perror("semaphore_wait error : semop failed\n");
+        return -1;
+    }
+
     while (res == -1) {
         if (tab_of_client[i] == dS) {
             tab_of_client[i] = -1;
@@ -153,7 +158,12 @@ int delete_client (int dS, int* tab_of_client,int semaphore) {
         }
         i = i+1;
     }
-    semaphore_unlock(semaphore);
+
+    int unlockCheck = semaphore_unlock(semaphore); //unlock the semaphore previously locked
+    if (unlockCheck == -1) {
+        perror("semaphore_unlock error : semop failed\n");
+        return -1;
+    }
     return res;
 }
 
@@ -167,11 +177,12 @@ int delete_client (int dS, int* tab_of_client,int semaphore) {
 void * discussion (void * arg) {
     struct thread_argument * argument = (struct thread_argument *) arg;
     int conversation = 1;
-    char *message;
+    char *message = NULL; //The message received. Initialized to NULL to avoid recv_message to free a non-allocated memory
     int dS = argument->descripteur;
+
     while (conversation) {
         int res =  recv_message(dS, &message);
-        printf("message recu : %s \n",message);
+        printf("Message recu : %s \n",message);
         if (res == 0) {
             puts("Deconnexion d'un client");
             int resultat = delete_client(dS,argument->tab_of_client,argument->semaphore_id);
@@ -183,13 +194,13 @@ void * discussion (void * arg) {
             exit(0);
         }
         else {
-            if  (strcmp(message,"fin") == 0) {
-                puts("Deconnexion du Client");
-                delete_client(dS,argument->tab_of_client,argument->semaphore_id);
+            if (strcmp(message,"fin") == 0) {
+                puts("Deconnexion du client");
+                delete_client(dS, argument->tab_of_client, argument->semaphore_id);
                 close(dS);
                 conversation = 0;
             }
-            res = send_all(dS, message, argument->tab_of_client,argument->semaphore_id,argument->Nb_client_max); 
+            res = send_all(dS, message, argument->tab_of_client, argument->semaphore_id, argument->Nb_client_max); 
         }
         sleep(0.01);
     }
