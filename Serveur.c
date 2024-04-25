@@ -133,6 +133,15 @@ int send_all(int socket_sender, char *message, int *tab_client,int semaphore,int
     return 0;
 }
 
+/**
+ * Deletes a client from the client array.
+ * 
+ * This function searches for the client socket descriptor in the client array and deletes it.
+ * 
+ * @param dS The client socket descriptor to delete.
+ * @param tab_of_client The array of client socket descriptors.
+ * @return Returns 0 if the client was successfully deleted, -1 otherwise.
+ */
 int delete_client (int dS, int* tab_of_client,int semaphore) {
     int res = -1;
     int i = 0;
