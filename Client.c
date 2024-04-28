@@ -5,11 +5,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include "utilitaire.h"
 
 /*
 This program generates client for communication
 Launch it with command : ./Client ip port
-//Example : Launch : ./Client 127.0.0.1 3500 and then ./Client 127.0.0.1 3500
+//Example : Launch : ./Client 127.0.0.1 3500 for each client 
 */
 
 /*
@@ -34,17 +35,22 @@ Return 0 if all went good and -1 if there was an error
 void* message_reception (void * args) {
     int * dS = (int*) args;
     int running = 1;
-    char * message = (char *)malloc(sizeof(char) * 301);
+    char * message;
     while (running) {
-        int checkReceive = recv(*dS, message, 300, 0); //Reception of message
-        if (checkReceive == -1){
-            perror("Receive failed");
-            exit(-1);
+        int checkReceive = recv_message(*dS, &message); //Reception of message
+        if (checkReceive < 0) {
+            perror("Error receiving message");
         }
-        puts(message);
+        else if (checkReceive == 0) {
+            puts("Connection disconnected");
+            pthread_exit(0);
+        }
+        else {
+            puts(message);
+        }
         sleep(0.1);
     }
-    pthread_exit(0); 
+    pthread_exit(0);
 }
 
 /*
@@ -54,23 +60,22 @@ The id of the socket used is required in argument
 Return 0 if it succeed, -1 if an error occured
 */
 void* message_sending (void * args) {
-    //printf("Entrée dans la fonction d'envoie de message");
     int* dS = (int*) args;
     char * message = (char *)malloc(sizeof(char) * 301);
     int running = 1;
     while (running) {
         fgets(message,300,stdin);
         message = remove_backslash(message);
-        int checkSend = send(*dS, message, 300 , 0); // Sending of message to server
+        int checkSend = send_message(*dS, message); // Sending of message to server
         if (checkSend == -1){
             perror("Send failed");
-            exit(-1);
+            exit(EXIT_FAILURE);
         }
-        else {
-            //puts("le message envoyé");
-            //puts(message);
+        if (strcmp(message,"fin") == 0) {
+            puts("Deconnexion de la discussion");
+            running = 0;
         }
-        sleep(1);
+        sleep(0.1);
     }
     pthread_exit(0);
 }
@@ -119,14 +124,13 @@ int main(int argc, char *argv[]) {
     int i = pthread_create (&tid, NULL, message_reception,&dS);
     int j = pthread_create(&tid2,NULL,message_sending,&dS);
 
-    //Waiting for the close of the 2 threads 
-    pthread_join(tid,NULL);
-    pthread_join(tid2,NULL);
-
-
-    int checkSD = close(dS);
-    if (checkSD == -1){
-        perror("Shutdown failed");
-        exit(0);
+    if (pthread_join(tid,NULL) == 0 || pthread_join(tid2,NULL) == 0) {
+        int checkSD = close(dS);
+        if (checkSD == -1){
+            perror("Shutdown failed");
+        } 
+        else {
+            exit(0);
+        }
     }
 }
