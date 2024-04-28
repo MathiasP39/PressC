@@ -299,9 +299,36 @@ int main(int argc, char *argv[]) {
 
     int tab_client[NB_CLIENT_MAX];
 
-    int cleSem = ftok("cle_sem.txt", 'r'); 
+    int cleSem = ftok("key_sem.txt", 'r'); 
+
+    if (cleSem == -1) {
+        perror("Error reading key file");
+        exit(EXIT_FAILURE);
+    }
 
     int idSem = semget(cleSem, 1,0666);
+
+    if (idSem == -1) {
+        perror("Error to get the semaphore id");
+        exit(EXIT_FAILURE);
+    }
+
+    /*
+    Here we control if we get an already used semaphore
+    So we get the value and want to set it to 1, so we add one if was just initialise or we substract the actual value - 1
+    */
+    int valSem = semctl(idSem, 0, GETVAL);
+
+    if (valSem == 0) {
+        semaphore_unlock(idSem); 
+    }
+    else if (valSem > 1){
+        struct sembuf reset_buffer;
+        reset_buffer.sem_num = 0;
+        reset_buffer.sem_op = -(valSem-1);
+        reset_buffer.sem_flg = 0;
+        int res = semop(idSem,&reset_buffer,1);
+    }
 
     //Initialisation of all value of the tab
     int res = semaphore_wait(idSem);
