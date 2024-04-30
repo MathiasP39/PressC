@@ -6,8 +6,8 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/ipc.h>
-//#include <sys/types.h>
 #include <sys/sem.h>
+#include <semaphore.h>
 #include "utilitaire.h"
 
 
@@ -24,7 +24,7 @@
 struct thread_argument {
     int descripteur;        /**< The file descriptor of the client connection */
     int* tab_of_client;     /**< An array of client descriptors */
-    int semaphore_id;
+    sem_t semaphore_id;
     int Nb_client_max;
 };
 
@@ -38,7 +38,7 @@ struct thread_argument {
 struct arg_get_client {
     int* tab_client;        /**< Array of client IDs */
     int Nb_client_max;      /**< Maximum number of clients */
-    int semaphore_id;
+    sem_t semaphore_id;
     int dS;               /**< Server socket descriptor */
 };
 
@@ -299,43 +299,16 @@ int main(int argc, char *argv[]) {
 
     int tab_client[NB_CLIENT_MAX];
 
-    int cleSem = ftok("key_sem.txt", 'r'); 
+    sem_t sem;
 
-    if (cleSem == -1) {
-        perror("Error reading key file");
-        exit(EXIT_FAILURE);
-    }
-
-    int idSem = semget(cleSem, 1,0666);
-
-    if (idSem == -1) {
-        perror("Error to get the semaphore id");
-        exit(EXIT_FAILURE);
-    }
-
-    /*
-    Here we control if we get an already used semaphore
-    So we get the value and want to set it to 1, so we add one if was just initialise or we substract the actual value - 1
-    */
-    int valSem = semctl(idSem, 0, GETVAL);
-
-    if (valSem == 0) {
-        semaphore_unlock(idSem); 
-    }
-    else if (valSem > 1){
-        struct sembuf reset_buffer;
-        reset_buffer.sem_num = 0;
-        reset_buffer.sem_op = -(valSem-1);
-        reset_buffer.sem_flg = 0;
-        int res = semop(idSem,&reset_buffer,1);
-    }
+    int res = sem_init(&sem,0,1);
 
     //Initialisation of all value of the tab
-    int res = semaphore_wait(idSem);
+    int res = sem_wait(&sem);
     for (int i = 0; i<NB_CLIENT_MAX; ++i) {
         tab_client[i] = -1;
     }
-    res = semaphore_unlock(idSem);
+    res = sem_post(&sem);
 
     int ecoute = listen(dS,1);
     if (ecoute < 0) {
@@ -356,7 +329,7 @@ int main(int argc, char *argv[]) {
 
     pthread_t thread_add_client;
 
-    struct arg_get_client arg_client = {tab_client,NB_CLIENT_MAX,idSem,dS};
+    struct arg_get_client arg_client = {tab_client,NB_CLIENT_MAX,sem,dS};
 
     int k = pthread_create(&thread_add_client, NULL, get_client, &arg_client);
 
