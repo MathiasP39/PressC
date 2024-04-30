@@ -376,6 +376,26 @@ void * get_client (void * arg) {
     }
 } 
 
+void analyse(char * arg) {
+    if arg[0] == '/' {
+        char *tok = strtok(arg+1, " ")
+        switch (tok)
+        {
+        case kick :
+            kick
+            break;
+        
+        default:
+            break;
+        }
+    }
+}
+
+void commande(char * arg, int i) {
+    while arg[i] != ' ' {
+
+    }
+}
 
 /**
  * @brief The main function of the server program.
@@ -465,4 +485,5 @@ int main(int argc, char *argv[]) {
     close(dS);
 
     return 0;
+
 }
