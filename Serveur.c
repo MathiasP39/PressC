@@ -377,23 +377,41 @@ void * get_client (void * arg) {
 } 
 
 void analyse(char * arg) {
-    if arg[0] == '/' {
+    if (arg[0] == '/') {
         char *tok = strtok(arg+1, " ")
-        switch (tok)
-        {
-        case kick :
-            kick
-            break;
-        
-        default:
-            break;
+        switch (tok) {
+            case kick :
+                tok = strtok(NULL, ' ')
+                kick(tok);
+                break;
+            case whisper :
+                char username[50];
+                char message[100];
+                if (sscanf("/whisper %49s \"%99[^\"]\"", username, message) == 2) {
+                    whisper(username, message, tab_client);
+                }else {ERROR}
+            default:
+                break;
         }
     }
 }
 
-void commande(char * arg, int i) {
-    while arg[i] != ' ' {
+void whisper(char * username, char * message, int * tab_client) {
+    for (int i = 0; i<10; i++) {
+        if (?? != -1 && ?? === username) {
+            int res = send_message(username, message);
+            if (res < 0) {
+                perror("Error sending the message");
+            }
+        }
+    }
+}
 
+void kick(char * username) {
+    for (int i = 0; i<10; i++) {
+        if (?? != -1 && ?? === username) {
+            
+        }
     }
 }
 
