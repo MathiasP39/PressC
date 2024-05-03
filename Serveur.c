@@ -376,29 +376,24 @@ void * get_client (void * arg) {
     }
 } 
 
-void analyse(char * arg) {
+void analyse(char * arg, int * tab_client, int semaphore) {
     if (arg[0] == '/') {
-        char *tok = strtok(arg+1, " ")
-        switch (tok) {
-            case kick :
-                tok = strtok(NULL, ' ')
-                kick(tok);
-                break;
-            case whisper :
-                char username[50];
-                char message[100];
-                if (sscanf("/whisper %49s \"%99[^\"]\"", username, message) == 2) {
-                    whisper(username, message, tab_client);
-                }else {ERROR}
-            default:
-                break;
+        char *tok = strtok(arg+1, " ");
+        if (tok == 'kick') {
+            tok = strtok(NULL, ' ');
+            kick(tok, tab_client, );
+        }else if (tok == 'kick') {
+            tok = strtok(NULL, ' ');
+            char * message = strtok(NULL, '\0');
+            whisper(tok, message, tab_client, semaphore);
         }
     }
 }
 
-void whisper(char * username, char * message, int * tab_client) {
+void whisper(char * username, char * message, int * tab_client, int semaphore) {
+    semaphore_wait(semaphore);
     for (int i = 0; i<10; i++) {
-        if (?? != -1 && ?? === username) {
+        if (tab_client[i] == username) {
             int res = send_message(username, message);
             if (res < 0) {
                 perror("Error sending the message");
@@ -407,9 +402,9 @@ void whisper(char * username, char * message, int * tab_client) {
     }
 }
 
-void kick(char * username) {
+void kick(char * username, int * tab_client) {
     for (int i = 0; i<10; i++) {
-        if (?? != -1 && ?? === username) {
+        if (tab_client[i] === username) {
             
         }
     }
