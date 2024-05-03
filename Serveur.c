@@ -6,8 +6,8 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/ipc.h>
-//#include <sys/types.h>
 #include <sys/sem.h>
+#include <semaphore.h>
 #include "utilitaire.h"
 
 
@@ -24,7 +24,7 @@
 struct thread_argument {
     int descripteur;        /**< The file descriptor of the client connection */
     int* tab_of_client;     /**< An array of client descriptors */
-    int semaphore_id;
+    sem_t semaphore_id;
     int Nb_client_max;
 };
 
@@ -38,8 +38,9 @@ struct thread_argument {
 struct arg_get_client {
     int* tab_client;        /**< Array of client IDs */
     int Nb_client_max;      /**< Maximum number of clients */
-    int semaphore_id;
-    int dS;               /**< Server socket descriptor */
+    sem_t semaphore_id;
+    int dS;                /**< Server socket descriptor */
+    sem_t sem_nb_client;
 };
 
 
@@ -119,8 +120,8 @@ int connect_to_client(struct sockaddr_in adress, int descripteur) {
  * @param message The message to send.
  * @param tab_client The array of client socket descriptors.
  */
-int send_all(int socket_sender, char *message, int *tab_client,int semaphore,int size) {
-    semaphore_wait(semaphore);
+int send_all(int socket_sender, char *message, int *tab_client,sem_t semaphore,int size) {
+    sem_wait(&semaphore);
     for (int i = 0; i<10; i++) {
         if (tab_client[i] != -1 && tab_client[i] != socket_sender) {
             int res = send_message(tab_client[i], message);
@@ -129,7 +130,7 @@ int send_all(int socket_sender, char *message, int *tab_client,int semaphore,int
             }
         }
     }
-    semaphore_unlock(semaphore);
+    sem_post(&semaphore);
     return 0;
 }
 
@@ -142,10 +143,10 @@ int send_all(int socket_sender, char *message, int *tab_client,int semaphore,int
  * @param tab_of_client The array of client socket descriptors.
  * @return Returns 0 if the client was successfully deleted, -1 otherwise.
  */
-int delete_client (int dS, int* tab_of_client,int semaphore) {
+int delete_client (int dS, int* tab_of_client,sem_t semaphore) {
     int res = -1;
     int i = 0;
-    int waitCheck = semaphore_wait(semaphore); //wait for the semaphore to be available
+    int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
     if (waitCheck == -1) {
         perror("semaphore_wait error : semop failed\n");
         return -1;
@@ -159,11 +160,13 @@ int delete_client (int dS, int* tab_of_client,int semaphore) {
         i = i+1;
     }
 
-    int unlockCheck = semaphore_unlock(semaphore); //unlock the semaphore previously locked
+    int unlockCheck = sem_post(&semaphore); //unlock the semaphore previously locked
     if (unlockCheck == -1) {
-        perror("semaphore_unlock error : semop failed\n");
+        perror("sem_post error : semop failed\n");
         return -1;
     }
+
+    close(dS);
     return res;
 }
 
@@ -179,30 +182,20 @@ void * discussion (void * arg) {
     int conversation = 1;
     char *message = NULL; //The message received. Initialized to NULL to avoid recv_message to free a non-allocated memory
     int dS = argument->descripteur;
-
     while (conversation) {
         int res =  recv_message(dS, &message);
         printf("Message recu : %s \n",message);
-        if (res == 0) {
-            puts("Deconnexion d'un client");
-            int resultat = delete_client(dS,argument->tab_of_client,argument->semaphore_id);
-            close(dS);
-            pthread_exit(NULL);
-        }
-        else if (res < 0) {
+        if (res < 0) {
             perror("Error receiving the message");
-            exit(0);
+        }
+        else if (res == 0 || strcmp(message,"fin") == 0) {
+            puts("Deconnexion d'un client");
+            delete_client(dS,argument->tab_of_client,argument->semaphore_id);
+            conversation = 0;
         }
         else {
-            if (strcmp(message,"fin") == 0) {
-                puts("Deconnexion du client");
-                delete_client(dS, argument->tab_of_client, argument->semaphore_id);
-                close(dS);
-                conversation = 0;
-            }
             res = send_all(dS, message, argument->tab_of_client, argument->semaphore_id, argument->Nb_client_max); 
         }
-        sleep(0.01);
     }
     pthread_exit(0);
 }
@@ -217,18 +210,18 @@ void * discussion (void * arg) {
  * @param dS The client socket descriptor to be added.
  * @return Returns 0 if the client was successfully added, -1 otherwise.
  */
-int add_client(int *tab_client, int size, int dS,int semaphore) {
+int add_client(int *tab_client, int size, int dS,sem_t semaphore) {
     int res = -1;
     int i = 0;
-    semaphore_wait(semaphore);
-    while (res == -1 && i < size) {
+    sem_wait(&semaphore);
+    while ( i < size && res == -1) {
         if (tab_client[i] == -1) {
             tab_client[i] = dS;
             res = 0;
         }
         ++i;
     }
-    semaphore_unlock(semaphore);
+    sem_post(&semaphore);
     return res;
 }
 
@@ -248,13 +241,14 @@ void * get_client (void * arg ) {
     while (1) {
         struct sockaddr_in aC ;
         int dSClient = connect_to_client(aC,args->dS);
-        int res = add_client(args->tab_client,args->Nb_client_max,dSClient,args->semaphore_id);
+        int res = sem_trywait(&(args->Nb_client_max));
         if (res == -1) {
             char message[] = "You can't connect there is already too many people connected, retry later";
             send_message(dSClient, message);
             close(dSClient);
         }
-        else if (res == 0) {
+        else {
+            add_client(args->tab_client,args->Nb_client_max,dSClient,args->semaphore_id);
             pthread_t tid;
             struct thread_argument argument = {dSClient,args->tab_client,args->semaphore_id,args->Nb_client_max};
             int i = pthread_create (&tid, NULL, discussion, &argument);
@@ -297,45 +291,22 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
+    sem_t sem_nb_client;
+
     int tab_client[NB_CLIENT_MAX];
 
-    int cleSem = ftok("key_sem.txt", 'r'); 
+    int res = sem_init(&sem_nb_client,0,NB_CLIENT_MAX);
 
-    if (cleSem == -1) {
-        perror("Error reading key file");
-        exit(EXIT_FAILURE);
-    }
+    sem_t sem;
 
-    int idSem = semget(cleSem, 1,0666);
-
-    if (idSem == -1) {
-        perror("Error to get the semaphore id");
-        exit(EXIT_FAILURE);
-    }
-
-    /*
-    Here we control if we get an already used semaphore
-    So we get the value and want to set it to 1, so we add one if was just initialise or we substract the actual value - 1
-    */
-    int valSem = semctl(idSem, 0, GETVAL);
-
-    if (valSem == 0) {
-        semaphore_unlock(idSem); 
-    }
-    else if (valSem > 1){
-        struct sembuf reset_buffer;
-        reset_buffer.sem_num = 0;
-        reset_buffer.sem_op = -(valSem-1);
-        reset_buffer.sem_flg = 0;
-        int res = semop(idSem,&reset_buffer,1);
-    }
+    res = sem_init(&sem,0,1);
 
     //Initialisation of all value of the tab
-    int res = semaphore_wait(idSem);
+    res = sem_wait(&sem);
     for (int i = 0; i<NB_CLIENT_MAX; ++i) {
         tab_client[i] = -1;
     }
-    res = semaphore_unlock(idSem);
+    res = sem_post(&sem);
 
     int ecoute = listen(dS,1);
     if (ecoute < 0) {
@@ -356,7 +327,7 @@ int main(int argc, char *argv[]) {
 
     pthread_t thread_add_client;
 
-    struct arg_get_client arg_client = {tab_client,NB_CLIENT_MAX,idSem,dS};
+    struct arg_get_client arg_client = {tab_client,NB_CLIENT_MAX,sem,dS,sem_nb_client};
 
     int k = pthread_create(&thread_add_client, NULL, get_client, &arg_client);
 
