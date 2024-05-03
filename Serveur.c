@@ -119,8 +119,8 @@ int connect_to_client(struct sockaddr_in adress, int descripteur) {
  * @param message The message to send.
  * @param tab_client The array of client socket descriptors.
  */
-int send_all(int socket_sender, char *message, int *tab_client,int semaphore,int size) {
-    semaphore_wait(semaphore);
+int send_all(int socket_sender, char *message, int *tab_client,sem_t semaphore,int size) {
+    sem_wait(&semaphore);
     for (int i = 0; i<10; i++) {
         if (tab_client[i] != -1 && tab_client[i] != socket_sender) {
             int res = send_message(tab_client[i], message);
@@ -129,7 +129,7 @@ int send_all(int socket_sender, char *message, int *tab_client,int semaphore,int
             }
         }
     }
-    semaphore_unlock(semaphore);
+    sem_post(&semaphore);
     return 0;
 }
 
@@ -142,10 +142,10 @@ int send_all(int socket_sender, char *message, int *tab_client,int semaphore,int
  * @param tab_of_client The array of client socket descriptors.
  * @return Returns 0 if the client was successfully deleted, -1 otherwise.
  */
-int delete_client (int dS, int* tab_of_client,int semaphore) {
+int delete_client (int dS, int* tab_of_client,sem_t semaphore) {
     int res = -1;
     int i = 0;
-    int waitCheck = semaphore_wait(semaphore); //wait for the semaphore to be available
+    int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
     if (waitCheck == -1) {
         perror("semaphore_wait error : semop failed\n");
         return -1;
@@ -159,7 +159,7 @@ int delete_client (int dS, int* tab_of_client,int semaphore) {
         i = i+1;
     }
 
-    int unlockCheck = semaphore_unlock(semaphore); //unlock the semaphore previously locked
+    int unlockCheck = sem_post(&semaphore); //unlock the semaphore previously locked
     if (unlockCheck == -1) {
         perror("semaphore_unlock error : semop failed\n");
         return -1;
@@ -217,10 +217,10 @@ void * discussion (void * arg) {
  * @param dS The client socket descriptor to be added.
  * @return Returns 0 if the client was successfully added, -1 otherwise.
  */
-int add_client(int *tab_client, int size, int dS,int semaphore) {
+int add_client(int *tab_client, int size, int dS,sem_t semaphore) {
     int res = -1;
     int i = 0;
-    semaphore_wait(semaphore);
+    sem_wait(&semaphore);
     while (res == -1 && i < size) {
         if (tab_client[i] == -1) {
             tab_client[i] = dS;
@@ -228,7 +228,7 @@ int add_client(int *tab_client, int size, int dS,int semaphore) {
         }
         ++i;
     }
-    semaphore_unlock(semaphore);
+    sem_post(&semaphore);
     return res;
 }
 
@@ -304,7 +304,7 @@ int main(int argc, char *argv[]) {
     int res = sem_init(&sem,0,1);
 
     //Initialisation of all value of the tab
-    int res = sem_wait(&sem);
+    res = sem_wait(&sem);
     for (int i = 0; i<NB_CLIENT_MAX; ++i) {
         tab_client[i] = -1;
     }
