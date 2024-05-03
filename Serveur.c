@@ -208,7 +208,6 @@ void * discussion (void * arg) {
 
     while (conversation) {
         int res =  recv_message(dS, &message);
-        printf("Message recu : %s \n",message);
         if (res == 0) {
             puts("Deconnexion d'un client");
             int resultat = delete_client(dS, argument->tab_of_client, argument->semaphore_id);
@@ -216,6 +215,7 @@ void * discussion (void * arg) {
             pthread_exit(NULL);
         }
         else if (res < 0) {
+            printf("La valeur de res est : %d",res);
             perror("Error receiving the message");
         }
         else if (res == 0 || strcmp(message,"fin") == 0) {
@@ -224,6 +224,7 @@ void * discussion (void * arg) {
             conversation = 0;
         }
         else {
+            printf("Message recu : %s \n",message);
             res = send_all(dS, message, argument->tab_of_client, argument->semaphore_id, argument->Nb_client_max); 
         }
     }
@@ -310,11 +311,6 @@ int get_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t sem
         if (tab_client[i].socket == dS) {
             tab_client[i].nickname = message;
         }
-        int verif = send_message(dS, "ok"); //send a message to the client to confirm the nickname
-        if (verif == -1) {
-            perror("Error confirming the nickname");
-            return -1;
-        }
     }
 
     int check = send_message(dS, "\nBienvenue dans la discussion !\n\n");
@@ -384,7 +380,6 @@ int main(int argc, char *argv[]) {
         printf("Usage : %s <port>\n", argv[0]);
         return -1;
     }
-
     printf("Start program\n");
     //There is the const that define the maximum the number of client handled by the server
     const int NB_CLIENT_MAX = 10;

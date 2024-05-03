@@ -133,15 +133,7 @@ int main(int argc, char *argv[]) {
             perror("Send failed");
             exit(0);
         }
-        char * message;
-        int checkReceive = recv_message(dS,&message);
-        if (checkReceive == -1){
-            perror("Receive failed");
-            exit(0);
-        }
-        if (strcmp(message,"ok") == 0) {
-            auth = 0;
-        }
+        auth = 0;
     }
 
     int i = pthread_create (&tid, NULL, message_reception,&dS);
