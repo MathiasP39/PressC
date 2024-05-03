@@ -6,6 +6,8 @@
 #include <string.h>
 #include <stdio.h>
 
+const int NB_CLIENT_MAX = 10;
+
 int send_message (int descripteur, char* message);
 
 int recv_message(int descripteur,char ** message);
