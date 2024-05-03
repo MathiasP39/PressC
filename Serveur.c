@@ -400,11 +400,12 @@ void whisper(char * username, char * message, int * tab_client, int semaphore) {
             }
         }
     }
+    semaphore_unlock(semaphore);
 }
 
-void kick(char * username, int * tab_client) {
+void kick(char * username, int * tab_client, int semaphore, int dS) {
     for (int i = 0; i<10; i++) {
-        if (tab_client[i] === username) {
+        if (tab_client[i] == username) {
             
         }
     }
