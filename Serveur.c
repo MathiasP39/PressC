@@ -164,7 +164,7 @@ int send_all(int socket_sender, char *message, struct client *tab_client,sem_t s
  * @param tab_of_client The array of client socket descriptors.
  * @return Returns 0 if the client was successfully deleted, -1 otherwise.
  */
-int delete_client (int dS, struct client* tab_of_client,int semaphore) {
+int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
     int res = -1;
     int i = 0;
     int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
@@ -240,10 +240,10 @@ void * discussion (void * arg) {
  * @param dS The client socket descriptor to be added.
  * @return Returns 0 if the client was successfully added, -1 otherwise.
  */
-int add_client(struct client *tab_client, int size, int dS, int semaphore) {
+int add_client(struct client *tab_client, int size, int dS, sem_t semaphore) {
     int res = -1;
     int i = 0;
-    int waitCheck = semaphore_wait(semaphore);
+    int waitCheck = sem_wait(&semaphore);
     if (waitCheck == -1) {
         perror("semaphore_wait error");
         return res;
@@ -268,12 +268,12 @@ int add_client(struct client *tab_client, int size, int dS, int semaphore) {
  * @param semaphore The semaphore used for synchronization.
  * @return 0 if successful, -1 otherwise.
  */
-int get_nickname(struct client *tab_client, int Nb_client_max, int dS, int semaphore) {
+int get_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t semaphore) {
     int compt = -1;
     int i = 0;
     char *message = NULL;
 
-    int waitCheck = semaphore_wait(semaphore); //wait for the semaphore to be available
+    int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
     if (waitCheck == -1) {
         perror("semaphore_wait error");
         return compt;
@@ -323,7 +323,7 @@ int get_nickname(struct client *tab_client, int Nb_client_max, int dS, int semap
         return -1;
     }
 
-    int unlockCheck = semaphore_unlock(semaphore); //unlock
+    int unlockCheck = sem_post(&semaphore); //unlock
     if (unlockCheck == -1) {
         perror("semaphore_unlock error");
         return -1;
@@ -345,10 +345,11 @@ int get_nickname(struct client *tab_client, int Nb_client_max, int dS, int semap
  */
 void * get_client (void * arg) {
     struct arg_get_client *args = (struct arg_get_client *) arg;
+    sem_t semaphore = args->sem_nb_client;
     while (1) {
         struct sockaddr_in aC ;
         int dSClient = connect_to_client(aC,args->dS);
-        int res = sem_trywait(&(args->Nb_client_max));
+        int res = sem_trywait(&semaphore);
         res = add_client(args->tab_client, args->Nb_client_max, dSClient, args->semaphore_id);
         if (res == -1) {
             char message[] = "You can't connect there is already too many people connected, retry later";
@@ -362,7 +363,7 @@ void * get_client (void * arg) {
                 close(dSClient);
             }
             pthread_t tid;
-            struct thread_argument argument = {dSClient, args->tab_client, args->semaphore_id, args->Nb_client_max};
+            struct thread_argument argument = {dSClient,args->semaphore_id ,args->tab_client, args->Nb_client_max};
             int i = pthread_create (&tid, NULL, discussion, &argument);
         }
     }
