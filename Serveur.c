@@ -141,11 +141,11 @@ int connect_to_client(struct sockaddr_in adress, int descripteur) {
  * @param message The message to send.
  * @param tab_client The array of client socket descriptors.
  */
-int send_all(int socket_sender, char *message, int *tab_client,sem_t semaphore,int size) {
+int send_all(int socket_sender, char *message, struct client *tab_client,sem_t semaphore,int size) {
     sem_wait(&semaphore);
     for (int i = 0; i<10; i++) {
-        if (tab_client[i] != -1 && tab_client[i] != socket_sender) {
-            int res = send_message(tab_client[i], message);
+        if (tab_client[i].socket != -1 && tab_client[i].socket != socket_sender) {
+            int res = send_message(tab_client[i].socket, message);
             if (res < 0) {
                 perror("Error sending the message");
             }
@@ -203,34 +203,6 @@ void * discussion (void * arg) {
     int conversation = 1;
     char *message = NULL; //The message received. Initialized to NULL to avoid recv_message to free a non-allocated memory
     int dS = argument->descripteur;
-
-    //---The first message is the nickname of the client---
-
-    int send = send_message(dS, "Entrez votre pseudo : ");
-    if (send < 0) {
-        perror("Error sending the nickname request");
-        exit(0);
-    }
-
-    int res = recv_message(dS, &message);
-    if (res == 0) {
-        puts("Annulation de connexion d'un client");
-        int resultat = delete_client(dS, argument->tab_of_client, argument->semaphore_id);
-        close(dS);
-        pthread_exit(NULL);
-    }
-    else if (res < 0) {
-        perror("Error receiving the nickname");
-        exit(0);
-    }
-    else {
-        printf("Pseudo recu : %s \n",message);
-        for (int i = 0; i<NB_CLIENT_MAX; i++) {
-            if (argument->tab_of_client[i].socket == dS) {
-                argument->tab_of_client[i].nickname = message;
-            }
-        }
-    }
 
     //---The conversation loop---
 
@@ -296,7 +268,7 @@ int add_client(struct client *tab_client, int size, int dS, int semaphore) {
  * @param semaphore The semaphore used for synchronization.
  * @return 0 if successful, -1 otherwise.
  */
-int get_nickname(struct client *tab_client, int dS, int semaphore) {
+int get_nickname(struct client *tab_client, int Nb_client_max, int dS, int semaphore) {
     int compt = -1;
     int i = 0;
     char *message = NULL;
@@ -322,7 +294,7 @@ int get_nickname(struct client *tab_client, int dS, int semaphore) {
         }
         else {
             printf("Pseudo recu : %s \n",message);
-            for (int i = 0; i<NB_CLIENT_MAX; i++) {
+            for (int i = 0; i<Nb_client_max; i++) {
                 if (tab_client[i].nickname == message) {
                     int sendCheck = send_message(dS, "Pseudo indisponible, veuillez en choisir un autre :\n");
                     if (sendCheck == -1) {
@@ -334,9 +306,14 @@ int get_nickname(struct client *tab_client, int dS, int semaphore) {
             }
         }
     }
-    for (int i = 0; i<NB_CLIENT_MAX; i++) {
+    for (int i = 0; i<Nb_client_max; i++) {
         if (tab_client[i].socket == dS) {
             tab_client[i].nickname = message;
+        }
+        int verif = send_message(dS, "ok"); //send a message to the client to confirm the nickname
+        if (verif == -1) {
+            perror("Error confirming the nickname");
+            return -1;
         }
     }
 
@@ -379,7 +356,7 @@ void * get_client (void * arg) {
             close(dSClient);
         }
         else if (res == 0) {
-            res = get_nickname(args->tab_client, dSClient, args->semaphore_id);
+            res = get_nickname(args->tab_client, args->Nb_client_max, dSClient, args->semaphore_id);
             if (res == -1) {
                 perror("Error getting the nickname");
                 close(dSClient);
@@ -409,7 +386,7 @@ int main(int argc, char *argv[]) {
 
     printf("Start program\n");
     //There is the const that define the maximum the number of client handled by the server
-    //const int NB_CLIENT_MAX = 10; -> MAINTENANT DANS LE utilitaire.h
+    const int NB_CLIENT_MAX = 10;
 
     short running = 1;
 
