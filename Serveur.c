@@ -15,6 +15,9 @@
 // Exemple : ./Serveur 3500
 
 
+//-----STRUCTURES-----
+
+
 /**
  * @struct thread_argument
  * @brief Structure representing the arguments passed to a thread function.
@@ -22,11 +25,12 @@
  * This structure contains the file descriptor of the client connection and an array of client descriptors.
  */
 struct thread_argument {
-    int descripteur;        /**< The file descriptor of the client connection */
-    int* tab_of_client;     /**< An array of client descriptors */
+    int descripteur;        /**< The file descriptor of the client connection */ 
     sem_t semaphore_id;
+    struct client *tab_of_client;     /**< An array of clients */
     int Nb_client_max;
 };
+
 
 /**
  * @struct arg_get_client
@@ -36,12 +40,27 @@ struct thread_argument {
  * It includes an array of client IDs, the maximum number of clients, and the server socket descriptor.
  */
 struct arg_get_client {
-    int* tab_client;        /**< Array of client IDs */
+    struct client *tab_client;        /**< Array of clients */
     int Nb_client_max;      /**< Maximum number of clients */
     sem_t semaphore_id;
     int dS;                /**< Server socket descriptor */
     sem_t sem_nb_client;
 };
+
+
+/**
+ * @struct client
+ * @brief Represents a client connected to the server.
+ * 
+ * This struct contains information about a client, including their nickname and socket.
+ */
+struct client {
+    char *nickname; ///< The nickname of the client.
+    int socket;     ///< The socket associated with the client.
+};
+
+
+//-----FUNCTIONS-----
 
 
 /**
@@ -59,6 +78,7 @@ int creation_socket() {
     return dS;
 }
 
+
 /**
  * Creates and returns a socket address structure based on the given port number.
  *
@@ -74,6 +94,7 @@ struct sockaddr_in param_socket_adresse(char *port) {
     printf("Adresse creation \n");
     return adresse1;
 }
+
 
 /**
  * Binds a socket to a specific address.
@@ -120,11 +141,11 @@ int connect_to_client(struct sockaddr_in adress, int descripteur) {
  * @param message The message to send.
  * @param tab_client The array of client socket descriptors.
  */
-int send_all(int socket_sender, char *message, int *tab_client,sem_t semaphore,int size) {
+int send_all(int socket_sender, char *message, struct client *tab_client,sem_t semaphore,int size) {
     sem_wait(&semaphore);
     for (int i = 0; i<10; i++) {
-        if (tab_client[i] != -1 && tab_client[i] != socket_sender) {
-            int res = send_message(tab_client[i], message);
+        if (tab_client[i].socket != -1 && tab_client[i].socket != socket_sender) {
+            int res = send_message(tab_client[i].socket, message);
             if (res < 0) {
                 perror("Error sending the message");
             }
@@ -143,7 +164,7 @@ int send_all(int socket_sender, char *message, int *tab_client,sem_t semaphore,i
  * @param tab_of_client The array of client socket descriptors.
  * @return Returns 0 if the client was successfully deleted, -1 otherwise.
  */
-int delete_client (int dS, int* tab_of_client,sem_t semaphore) {
+int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
     int res = -1;
     int i = 0;
     int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
@@ -153,8 +174,8 @@ int delete_client (int dS, int* tab_of_client,sem_t semaphore) {
     }
 
     while (res == -1) {
-        if (tab_of_client[i] == dS) {
-            tab_of_client[i] = -1;
+        if (tab_of_client[i].socket == dS) {
+            tab_of_client[i].socket = -1;
             res = 0;
         }
         i = i+1;
@@ -182,10 +203,19 @@ void * discussion (void * arg) {
     int conversation = 1;
     char *message = NULL; //The message received. Initialized to NULL to avoid recv_message to free a non-allocated memory
     int dS = argument->descripteur;
+
+    //---The conversation loop---
+
     while (conversation) {
         int res =  recv_message(dS, &message);
-        printf("Message recu : %s \n",message);
-        if (res < 0) {
+        if (res == 0) {
+            puts("Deconnexion d'un client");
+            int resultat = delete_client(dS, argument->tab_of_client, argument->semaphore_id);
+            close(dS);
+            pthread_exit(NULL);
+        }
+        else if (res < 0) {
+            printf("La valeur de res est : %d",res);
             perror("Error receiving the message");
         }
         else if (res == 0 || strcmp(message,"fin") == 0) {
@@ -194,6 +224,7 @@ void * discussion (void * arg) {
             conversation = 0;
         }
         else {
+            printf("Message recu : %s \n",message);
             res = send_all(dS, message, argument->tab_of_client, argument->semaphore_id, argument->Nb_client_max); 
         }
     }
@@ -210,19 +241,91 @@ void * discussion (void * arg) {
  * @param dS The client socket descriptor to be added.
  * @return Returns 0 if the client was successfully added, -1 otherwise.
  */
-int add_client(int *tab_client, int size, int dS,sem_t semaphore) {
+int add_client(struct client *tab_client, int size, int dS, sem_t semaphore) {
     int res = -1;
     int i = 0;
-    sem_wait(&semaphore);
-    while ( i < size && res == -1) {
-        if (tab_client[i] == -1) {
-            tab_client[i] = dS;
+    int waitCheck = sem_wait(&semaphore);
+    if (waitCheck == -1) {
+        perror("semaphore_wait error");
+        return res;
+    }
+
+    while (res == -1 && i < size) {
+        if (tab_client[i].socket == -1) {
+            tab_client[i].socket = dS;
             res = 0;
         }
         ++i;
     }
     sem_post(&semaphore);
     return res;
+}
+
+/**
+ * Function to get the nickname of a client and store it in the client structure.
+ * 
+ * @param tab_client The array of client structures.
+ * @param dS The socket descriptor of the client.
+ * @param semaphore The semaphore used for synchronization.
+ * @return 0 if successful, -1 otherwise.
+ */
+int get_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t semaphore) {
+    int compt = -1;
+    int i = 0;
+    char *message = NULL;
+
+    int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
+    if (waitCheck == -1) {
+        perror("semaphore_wait error");
+        return compt;
+    }
+
+    while (compt == -1) {
+        compt = 0;
+        int res = recv_message(dS, &message);
+        if (res == 0) {
+            puts("Annulation de connexion d'un client");
+            int resultat = delete_client(dS, tab_client, semaphore);
+            close(dS);
+            pthread_exit(NULL);
+        }
+        else if (res < 0) {
+            perror("Error receiving the nickname");
+            exit(0);
+        }
+        else {
+            printf("Pseudo recu : %s \n",message);
+            for (int i = 0; i<Nb_client_max; i++) {
+                if (tab_client[i].nickname == message) {
+                    int sendCheck = send_message(dS, "Pseudo indisponible, veuillez en choisir un autre :\n");
+                    if (sendCheck == -1) {
+                        perror("Error sending the message");
+                        exit(0);
+                    }
+                    compt = -1;
+                }
+            }
+        }
+    }
+    for (int i = 0; i<Nb_client_max; i++) {
+        if (tab_client[i].socket == dS) {
+            tab_client[i].nickname = message;
+        }
+    }
+
+    int check = send_message(dS, "\nBienvenue dans la discussion !\n\n");
+    if (check == -1) {
+        perror("Error sending the message");
+        return -1;
+    }
+
+    int unlockCheck = sem_post(&semaphore); //unlock
+    if (unlockCheck == -1) {
+        perror("semaphore_unlock error");
+        return -1;
+    }
+
+    return compt;
 }
 
 
@@ -236,21 +339,27 @@ int add_client(int *tab_client, int size, int dS,sem_t semaphore) {
  *
  * @param arg The argument structure containing the client array, the maximum number of clients, and the server socket descriptor.
  */
-void * get_client (void * arg ) {
+void * get_client (void * arg) {
     struct arg_get_client *args = (struct arg_get_client *) arg;
+    sem_t semaphore = args->sem_nb_client;
     while (1) {
         struct sockaddr_in aC ;
         int dSClient = connect_to_client(aC,args->dS);
-        int res = sem_trywait(&(args->Nb_client_max));
+        int res = sem_trywait(&semaphore);
+        res = add_client(args->tab_client, args->Nb_client_max, dSClient, args->semaphore_id);
         if (res == -1) {
             char message[] = "You can't connect there is already too many people connected, retry later";
             send_message(dSClient, message);
             close(dSClient);
         }
-        else {
-            add_client(args->tab_client,args->Nb_client_max,dSClient,args->semaphore_id);
+        else if (res == 0) {
+            res = get_nickname(args->tab_client, args->Nb_client_max, dSClient, args->semaphore_id);
+            if (res == -1) {
+                perror("Error getting the nickname");
+                close(dSClient);
+            }
             pthread_t tid;
-            struct thread_argument argument = {dSClient,args->tab_client,args->semaphore_id,args->Nb_client_max};
+            struct thread_argument argument = {dSClient,args->semaphore_id ,args->tab_client, args->Nb_client_max};
             int i = pthread_create (&tid, NULL, discussion, &argument);
         }
     }
@@ -271,12 +380,11 @@ int main(int argc, char *argv[]) {
         printf("Usage : %s <port>\n", argv[0]);
         return -1;
     }
-
     printf("Start program\n");
     //There is the const that define the maximum the number of client handled by the server
     const int NB_CLIENT_MAX = 10;
 
-    short running = 1;    
+    short running = 1;
 
     int dS = creation_socket();
     if (dS == -1) {
@@ -293,7 +401,12 @@ int main(int argc, char *argv[]) {
 
     sem_t sem_nb_client;
 
-    int tab_client[NB_CLIENT_MAX];
+    struct client *tab_client = malloc(NB_CLIENT_MAX * sizeof(struct client)); //Array of client structure that contains the nickname and the socket of each client
+    for (int i = 0; i<NB_CLIENT_MAX; i++) {
+        tab_client[i].nickname = "";
+        tab_client[i].socket = -1;
+    }
+
 
     int res = sem_init(&sem_nb_client,0,NB_CLIENT_MAX);
 
@@ -304,7 +417,8 @@ int main(int argc, char *argv[]) {
     //Initialisation of all value of the tab
     res = sem_wait(&sem);
     for (int i = 0; i<NB_CLIENT_MAX; ++i) {
-        tab_client[i] = -1;
+        tab_client[i].nickname = "";
+        tab_client[i].socket = -1;
     }
     res = sem_post(&sem);
 
