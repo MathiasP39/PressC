@@ -250,6 +250,13 @@ void * discussion (void * arg) {
             strcat(pseudo,message);
             analyse(arg, argument->tab_of_client, argument->semaphore_id);
             res = send_all(dS, pseudo, argument->tab_of_client, argument->semaphore_id, argument->Nb_client_max); 
+            if (rep == 2) {
+                res = send_all(dS, message, argument->tab_client, argument->semaphore_id, argument->Nb_client_max); 
+            }else if (rep == 0) {
+                pthread_exit(0);
+            }else if (rep == -1){
+                perror('Commande inconnue');
+            }
         }
     }
     pthread_exit(0);
@@ -451,9 +458,20 @@ int get_dS(char * username) {
     return 1;
 }
 
-void close_serv() {
-
+int man(int descripteur) {
+    FILE* fichier = NULL;
+    char chaine[100] = "";
+    fichier = fopen("commande.txt", "r");
+    if (fichier != NULL) {
+        while (fgets(chaine, 100, fichier) != NULL) {
+            char message[] = chaine;
+            send_message(descripteur, message);
+        }
+        fclose(fichier);
+    }
+    return 0;
 }
+
 int get_dS(char * username) {}
 
 /**
