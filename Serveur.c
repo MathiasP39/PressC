@@ -155,6 +155,22 @@ int send_all(int socket_sender, char *message, struct client *tab_client,sem_t s
     return 0;
 }
 
+int get_nickname(struct client * tab_client,int dS, char **pseudo, int nb_client_max, sem_t semaphore) {
+    printf("Passage dans Nickname");
+    int i = 0;
+    int res = -1;
+    sem_wait(&semaphore);
+    while (i<nb_client_max && res == -1) {
+        if (tab_client[i].socket == dS) {
+            strcpy(*pseudo,tab_client[i].nickname);
+            strcat(*pseudo," : ");
+            res = 0;
+        }
+        i++;
+    }
+    return res;
+} 
+
 /**
  * Deletes a client from the client array.
  * 
@@ -208,24 +224,20 @@ void * discussion (void * arg) {
 
     while (conversation) {
         int res =  recv_message(dS, &message);
-        if (res == 0) {
-            puts("Deconnexion d'un client");
-            int resultat = delete_client(dS, argument->tab_of_client, argument->semaphore_id);
-            close(dS);
-            pthread_exit(NULL);
-        }
-        else if (res < 0) {
-            printf("La valeur de res est : %d",res);
+        if (res < 0) {
             perror("Error receiving the message");
         }
         else if (res == 0 || strcmp(message,"fin") == 0) {
             puts("Deconnexion d'un client");
-            delete_client(dS,argument->tab_of_client,argument->semaphore_id);
+            int resultat = delete_client(dS, argument->tab_of_client, argument->semaphore_id);
             conversation = 0;
         }
         else {
             printf("Message recu : %s \n",message);
-            res = send_all(dS, message, argument->tab_of_client, argument->semaphore_id, argument->Nb_client_max); 
+            char * pseudo = (char*) malloc(sizeof(char));
+            int code = get_nickname(argument->tab_of_client,dS,&pseudo,argument->Nb_client_max,argument->semaphore_id);
+            strcat(pseudo,message);
+            res = send_all(dS, pseudo, argument->tab_of_client, argument->semaphore_id, argument->Nb_client_max); 
         }
     }
     pthread_exit(0);
@@ -269,7 +281,7 @@ int add_client(struct client *tab_client, int size, int dS, sem_t semaphore) {
  * @param semaphore The semaphore used for synchronization.
  * @return 0 if successful, -1 otherwise.
  */
-int get_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t semaphore) {
+int set_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t semaphore) {
     int compt = -1;
     int i = 0;
     char *message = NULL;
@@ -328,7 +340,6 @@ int get_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t sem
     return compt;
 }
 
-
 /**
  * Gets a client connection.
  *
@@ -353,7 +364,7 @@ void * get_client (void * arg) {
             close(dSClient);
         }
         else if (res == 0) {
-            res = get_nickname(args->tab_client, args->Nb_client_max, dSClient, args->semaphore_id);
+            res = set_nickname(args->tab_client, args->Nb_client_max, dSClient, args->semaphore_id);
             if (res == -1) {
                 perror("Error getting the nickname");
                 close(dSClient);
