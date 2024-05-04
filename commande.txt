@@ -2,9 +2,10 @@ Voici le manuel utilisateur, il contient les différentes commandes de la messag
 Elles sont à utilisé en début de message
 
 /whisper : permet d'envoyer un message à une personne en particulier. Exemple : /whisper <Pseudo> <message>
-/kick 
+/kick : permet de deconnecter un client connecté au serveur . Exemple : /kick <Pseudo>
 /block
 /help
 /list
 /quit
+/shutdown
 
