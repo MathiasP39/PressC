@@ -5,4 +5,6 @@ Elles sont à utilisé en début de message
 /kick 
 /block
 /help
+/list
+/quit
 

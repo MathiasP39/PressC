@@ -201,7 +201,7 @@ int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
         perror("sem_post error : semop failed\n");
         return -1;
     }
-
+    send_message(dS,"Vous avez été kick");
     close(dS);
     return res;
 }
@@ -241,10 +241,8 @@ void whisper(char * username, char * message, struct client *tab_client, sem_t s
 }
 
 int kick(char * username, struct client *tab_client, sem_t semaphore) {
-    for (int i = 0; i<10; i++) {
-        if (tab_client[i].nickname == username)
-            delete_client(get_dS(username,tab_client,semaphore), tab_client, semaphore);
-        }
+    int dS_cible = get_dS(username,tab_client,semaphore);
+    delete_client(dS_cible, tab_client, semaphore);
     }
 
 
@@ -308,12 +306,11 @@ void * discussion (void * arg) {
     //---The conversation loop---
 
     while (conversation) {
-        
         int res =  recv_message(dS, &message);
-        if (res < 0) {
-            perror("Error receiving the message");
-        }
-        else if (res == 0 || strcmp(message,"fin") == 0) {
+        if (res <= 0) {
+            if (res == 0) {
+                perror("Error receiving the message");
+            }
             puts("Deconnexion d'un client");
             int resultat = delete_client(dS, argument->tab_client, argument->semaphore_id);
             conversation = 0;
