@@ -211,8 +211,11 @@ int get_dS(char * username,struct client* tab_client, sem_t semaphore) {
     int i = 0;
     sem_wait(&semaphore);
     while (i<10 && res == -1) {
+        if (tab_client[i].socket != -1) {
+            printf("Il y a l'utilisateur : %s qui a le dS : %d \n",tab_client[i].nickname,tab_client[i].socket);
+        } 
         if ( strcmp(username,tab_client[i].nickname) == 0) {
-            res = tab_client->socket;
+            res = tab_client[i].socket;
         }
         i++;
     }
@@ -222,13 +225,15 @@ int get_dS(char * username,struct client* tab_client, sem_t semaphore) {
 
 
 void whisper(char * username, char * message, struct client *tab_client, sem_t semaphore) {
+    printf("Passage dans whisper \n");
     int req;
     int dS_cible = get_dS(username,tab_client,semaphore);
+    printf("Le dS cible vaut : %d \n",dS_cible);
     if (dS_cible == -1) {
         perror("Utilisateur introuvable");
     }
     else {
-        int res = send_message(get_dS(username,tab_client,semaphore), message);
+        int res = send_message(dS_cible, message);
         if (res < 0) {
             perror("Error sending the message");
         }
@@ -317,7 +322,7 @@ void * discussion (void * arg) {
             printf("Message recu : %s \n",message);
             char * pseudo = (char*) malloc(sizeof(char));// Variabe to store nickname
             int code = get_nickname(argument->tab_client,dS,&pseudo,argument->Nb_client_max,argument->semaphore_id); //Here we get the nickname of the sender to add it to the message
-            int rep = analyse(message, argument->tab_client, argument->semaphore_id, argument->descripteur);
+            int rep = analyse(message, argument->tab_client, argument->semaphore_id, dS);
             if (rep == 2) { //Case no command
                 strcat(pseudo,message);
                 res = send_all(dS,pseudo, argument->tab_client, argument->semaphore_id, argument->Nb_client_max); 
