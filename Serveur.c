@@ -188,7 +188,7 @@ int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
         return -1;
     }
 
-    while (res == -1) {
+    while (res == -1 && i<10) {
         if (tab_client[i].socket == dS) {
             tab_client[i].socket = -1;
             res = 0;
@@ -202,7 +202,13 @@ int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
         return -1;
     }
     send_message(dS,"Vous avez été kick");
-    close(dS);
+    int code = close(dS);
+    if (code == 0) {
+        puts("Fermeture de la socket réussite");
+    }
+    else if (code == -1) {
+        perror("Error closing socket");
+    }
     return res;
 }
 
@@ -310,9 +316,13 @@ void * discussion (void * arg) {
         if (res <= 0) {
             if (res == 0) {
                 perror("Error receiving the message");
+                int resultat = delete_client(dS, argument->tab_client, argument->semaphore_id);
+                if (resultat == 0) {
+                puts("Suppression réussi");}
             }
+            
             puts("Deconnexion d'un client");
-            int resultat = delete_client(dS, argument->tab_client, argument->semaphore_id);
+
             conversation = 0;
         }
         else {
@@ -330,6 +340,7 @@ void * discussion (void * arg) {
             }
         }
     }
+    puts("Sortie du thread");
     pthread_exit(0);
 }
 
