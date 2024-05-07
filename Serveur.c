@@ -27,7 +27,6 @@
 struct thread_argument {
     int descripteur;        /**< The file descriptor of the client connection */
     struct client *tab_client;     /**< An array of client descriptors */
-    int descripteur;        /**< The file descriptor of the client connection */ 
     sem_t semaphore_id;
     struct client *tab_of_client;     /**< An array of clients */
     int Nb_client_max;
@@ -222,7 +221,7 @@ void * discussion (void * arg) {
     char *message = NULL; //The message received. Initialized to NULL to avoid recv_message to free a non-allocated memory
     int dS = argument->descripteur;
 
-    //The first message is the nickname of the client
+    //---The first message is the nickname of the client---
 
     int send = send_message(dS, "Entrez votre pseudo : ");
     if (send < 0) {
@@ -233,7 +232,7 @@ void * discussion (void * arg) {
     int res = recv_message(dS, &message);
     if (res == 0) {
         puts("Annulation de connexion d'un client");
-        int resultat = delete_client(dS,argument->tab_of_client->socket,argument->semaphore_id);
+        int resultat = delete_client(dS, argument->tab_of_client, argument->semaphore_id);
         close(dS);
         pthread_exit(NULL);
     }
@@ -250,7 +249,7 @@ void * discussion (void * arg) {
         }
     }
 
-    //The conversation loop
+    //---The conversation loop---
 
     while (conversation) {
         
@@ -447,10 +446,10 @@ void whisper(char * username, char * message, struct client *tab_client, int sem
 
 int kick(char * username, struct client *tab_client, int semaphore) {
     for (int i = 0; i<10; i++) {
-        if (tab_client[i].nickname == username) <<<<<<< HEADclient, semaphore);
+        if (tab_client[i].nickname == username);
         }
     }
-}
+
 
 int man(int descripteur) {
     FILE* fichier = NULL;
@@ -506,6 +505,11 @@ int main(int argc, char *argv[]) {
     struct client *tab_client = malloc(NB_CLIENT_MAX * sizeof(struct client)); //Array of client structure that contains the nickname and the socket of each client
 
     int res = sem_init(&sem_nb_client,0,NB_CLIENT_MAX);
+    for (int i = 0; i<NB_CLIENT_MAX; i++) {
+        tab_client[i].nickname = "";
+        tab_client[i].socket = -1;
+    }
+
 
     int res = sem_init(&sem_nb_client,0,NB_CLIENT_MAX);
 
