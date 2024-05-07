@@ -483,6 +483,8 @@ int main(int argc, char *argv[]) {
 
     int res = sem_init(&sem_nb_client,0,NB_CLIENT_MAX);
 
+    int res = sem_init(&sem_nb_client,0,NB_CLIENT_MAX);
+
     sem_t sem;
 
     res = sem_init(&sem,0,1);
