@@ -201,7 +201,7 @@ int delete_client (int dS, struct client *tab_client,sem_t semaphore) {
         perror("sem_post error : semop failed\n");
         return -1;
     }
-    send_message(dS,"Vous avez été kick");
+    send_message(dS,"Vous avez été déconnecté\n");
     int code = close(dS);
     if (code == 0) {
         puts("Fermeture de la socket réussite");
@@ -300,7 +300,7 @@ int quit (int descripteur, struct client *tab_client, sem_t semaphore) {
     if (res == 0) {
         puts("Suppression réussi");
     }
-    return res;
+    return 1;
 }
 
 /*
