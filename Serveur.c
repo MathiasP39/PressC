@@ -325,11 +325,6 @@ int set_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t sem
         if (tab_client[i].socket == dS) {
             tab_client[i].nickname = message;
         }
-        int verif = send_message(dS, "ok"); //send a message to the client to confirm the nickname
-        if (verif == -1) {
-            perror("Error confirming the nickname");
-            return -1;
-        }
     }
 
     int check = send_message(dS, "\nBienvenue dans la discussion !\n\n");

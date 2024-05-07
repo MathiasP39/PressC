@@ -134,6 +134,7 @@ int main(int argc, char *argv[]) {
             exit(0);
         }
 <<<<<<< HEAD
+<<<<<<< HEAD
         auth = 0;
 =======
         char * message;
@@ -146,6 +147,9 @@ int main(int argc, char *argv[]) {
             auth = 0;
         }
 >>>>>>> a6fb7e7 (Rebase, résolution conflit)
+=======
+        auth = 0;
+>>>>>>> 76ba315 (Merge, Fin de résolution des bugs suite au rebasage)
     }
 
     int i = pthread_create (&tid, NULL, message_reception,&dS);
