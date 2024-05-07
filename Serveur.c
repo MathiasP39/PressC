@@ -191,6 +191,7 @@ int delete_client (int dS, struct client *tab_client,sem_t semaphore) {
     while (res == -1 && i<10) {
         if (tab_client[i].socket == dS) {
             tab_client[i].socket = -1;
+            tab_client[i].nickname = "";
             res = 0;
         }
         i = i+1;
