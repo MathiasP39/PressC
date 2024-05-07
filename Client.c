@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
     if (pthread_join(tid,NULL) == 0 || pthread_join(tid2,NULL) == 0) {
         int checkSD = close(dS);
         if (checkSD == -1){
-            perror("Shutdown failed");
+            perror("shutdownserv failed");
         } 
         else {
             exit(0);
