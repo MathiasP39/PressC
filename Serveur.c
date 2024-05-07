@@ -295,8 +295,8 @@ int list(struct client *tab_client, sem_t semaphore, int descripteur) {
     return 1;
 }
 
-int quit (int dS, struct client *tab_client, sem_t semaphore) {
-    int res = delete_client(dS, tab_client, semaphore);
+int quit (int descripteur, struct client *tab_client, sem_t semaphore) {
+    int res = delete_client(descripteur, tab_client, semaphore);
     if (res == 0) {
         puts("Suppression réussi");
     }
@@ -333,7 +333,7 @@ int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descript
             return 1;
         }else if (strcmp(tok, "quit") == 0) {
             return quit(descripteur, tab_client, semaphore);
-        }else if (strcmp(tok, "shutdownserv") == 0) {
+        }else if (strcmp(tok, "shutdown") == 0) {
             shutdownserv(descripteur, tab_client, semaphore);
         }
     }else {return 2;}
