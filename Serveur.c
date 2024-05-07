@@ -25,6 +25,8 @@
  * This structure contains the file descriptor of the client connection and an array of client descriptors.
  */
 struct thread_argument {
+    int descripteur;        /**< The file descriptor of the client connection */
+    struct client *tab_client;     /**< An array of client descriptors */
     int descripteur;        /**< The file descriptor of the client connection */ 
     sem_t semaphore_id;
     struct client *tab_of_client;     /**< An array of clients */
@@ -40,7 +42,7 @@ struct thread_argument {
  * It includes an array of client IDs, the maximum number of clients, and the server socket descriptor.
  */
 struct arg_get_client {
-    struct client *tab_client;        /**< Array of clients */
+    struct client *tab_client;        /**< Array of client IDs */
     int Nb_client_max;      /**< Maximum number of clients */
     sem_t semaphore_id;
     int dS;                /**< Server socket descriptor */
@@ -220,7 +222,35 @@ void * discussion (void * arg) {
     char *message = NULL; //The message received. Initialized to NULL to avoid recv_message to free a non-allocated memory
     int dS = argument->descripteur;
 
-    //---The conversation loop---
+    //The first message is the nickname of the client
+
+    int send = send_message(dS, "Entrez votre pseudo : ");
+    if (send < 0) {
+        perror("Error sending the nickname request");
+        exit(0);
+    }
+
+    int res = recv_message(dS, &message);
+    if (res == 0) {
+        puts("Annulation de connexion d'un client");
+        int resultat = delete_client(dS,argument->tab_of_client->socket,argument->semaphore_id);
+        close(dS);
+        pthread_exit(NULL);
+    }
+    else if (res < 0) {
+        perror("Error receiving the nickname");
+        exit(0);
+    }
+    else {
+        printf("Pseudo recu : %s \n",message);
+        for (int i = 0; i<NB_CLIENT_MAX; i++) {
+            if (argument->tab_of_client[i].socket == dS) {
+                argument->tab_of_client[i].nickname = message;
+            }
+        }
+    }
+
+    //The conversation loop
 
     while (conversation) {
         
@@ -417,8 +447,7 @@ void whisper(char * username, char * message, struct client *tab_client, int sem
 
 int kick(char * username, struct client *tab_client, int semaphore) {
     for (int i = 0; i<10; i++) {
-        if (tab_client[i].nickname == username) {
-            delete_client(get_dS(username), tab_client, semaphore);
+        if (tab_client[i].nickname == username) <<<<<<< HEADclient, semaphore);
         }
     }
 }
@@ -455,7 +484,7 @@ int main(int argc, char *argv[]) {
     }
     printf("Start program\n");
     //There is the const that define the maximum the number of client handled by the server
-    const int NB_CLIENT_MAX = 10;
+    //const int NB_CLIENT_MAX = 10; -> MAINTENANT DANS LE utilitaire.h
 
     short running = 1;
 
@@ -475,11 +504,6 @@ int main(int argc, char *argv[]) {
     sem_t sem_nb_client;
 
     struct client *tab_client = malloc(NB_CLIENT_MAX * sizeof(struct client)); //Array of client structure that contains the nickname and the socket of each client
-    for (int i = 0; i<NB_CLIENT_MAX; i++) {
-        tab_client[i].nickname = "";
-        tab_client[i].socket = -1;
-    }
-
 
     int res = sem_init(&sem_nb_client,0,NB_CLIENT_MAX);
 
