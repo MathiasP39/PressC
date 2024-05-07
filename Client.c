@@ -121,37 +121,6 @@ int main(int argc, char *argv[]) {
     pthread_t tid;
     pthread_t tid2;
 
-    //Sending nickname
-    int auth = 1;
-    while (auth) {
-        printf("Pseudo : ");
-        char * nickname = (char *)malloc(sizeof(char) * 30);
-        fgets(nickname,30,stdin);
-        nickname = remove_backslash(nickname);
-        int checkSend = send_message(dS,nickname);
-        if (checkSend == -1){
-            perror("Send failed");
-            exit(0);
-        }
-<<<<<<< HEAD
-<<<<<<< HEAD
-        auth = 0;
-=======
-        char * message;
-        int checkReceive = recv_message(dS,&message);
-        if (checkReceive == -1){
-            perror("Receive failed");
-            exit(0);
-        }
-        if (strcmp(message,"ok") == 0) {
-            auth = 0;
-        }
->>>>>>> a6fb7e7 (Rebase, résolution conflit)
-=======
-        auth = 0;
->>>>>>> 76ba315 (Merge, Fin de résolution des bugs suite au rebasage)
-    }
-
     int i = pthread_create (&tid, NULL, message_reception,&dS);
     int j = pthread_create(&tid2,NULL,message_sending,&dS);
 
