@@ -177,7 +177,7 @@ int get_nickname(struct client * tab_client,int dS, char **pseudo, int nb_client
  * This function searches for the client socket descriptor in the client array and deletes it. It deletes by setting the value of the client socket descriptor to -1.
  * 
  * @param dS The client socket descriptor to delete.
- * @param tab_of_client The array of client socket descriptors.
+ * @param tab_client The array of client socket descriptors.
  * @return Returns 0 if the client was successfully deleted, -1 otherwise.
  */
 int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
@@ -377,7 +377,7 @@ void * get_client (void * arg) {
     }
 } 
  
-int analyse(char * arg, int * tab_client, int semaphore) {
+int analyse(char * arg, struct client *tab_client, int semaphore, int descripteur) {
     if (arg[0] == '/') {
         char *tok = strtok(arg+1, " ");
         if (strcmp(tok, 'kick')) {
@@ -391,34 +391,52 @@ int analyse(char * arg, int * tab_client, int semaphore) {
             return 1;
         }else if (strcmp(tok, 'close')) {
             return 0; //  0 = need to deconnect
+        }else if (strcmp(tok, 'man')) {
+            man(descripteur);
         }
-    }
+    }else {return 2;}
 }
 
-void whisper(char * username, char * message, int * tab_client, int semaphore) {
+void whisper(char * username, char * message, struct client *tab_client, int semaphore) {
     semaphore_wait(semaphore);
+    int req;
     for (int i = 0; i<10; i++) {
-        if (tab_client[i] == username) {
+        if (tab_client[i].nickname == username) {
             int res = send_message(username, message);
+            req = 1;
             if (res < 0) {
                 perror("Error sending the message");
             }
+        }
+        if (req != 1) {
+            perror('Utilisateur introuvable');
         }
     }
     semaphore_unlock(semaphore);
 }
 
-int kick(char * username, int * tab_client, int semaphore) {
+int kick(char * username, struct client *tab_client, int semaphore) {
     for (int i = 0; i<10; i++) {
-        if (tab_client[i] == username) {
+        if (tab_client[i].nickname == username) {
             delete_client(get_dS(username), tab_client, semaphore);
         }
     }
 }
 
-void close_serv() {
-
+int man(int descripteur) {
+    FILE* fichier = NULL;
+    char chaine[100] = "";
+    fichier = fopen("commande.txt", "r");
+    if (fichier != NULL) {
+        while (fgets(chaine, 100, fichier) != NULL) {
+            char message[] = chaine;
+            send_message(descripteur, message);
+        }
+        fclose(fichier);
+    }
+    return 0;
 }
+
 int get_dS(char * username) {}
 
 /**
