@@ -14,6 +14,8 @@
 //Command to launch this program : ./Serveur port
 // Exemple : ./Serveur 3500
 
+//-----CONSTANTS-----
+const int NB_CLIENT_MAX = 10;
 
 //-----STRUCTURES-----
 
@@ -106,7 +108,7 @@ struct sockaddr_in param_socket_adresse(char *port) {
 int make_bind(int socket, struct sockaddr_in adresse) {
     int connect = bind(socket, (struct sockaddr*)&adresse, sizeof(adresse)); //variable "connect" to avoid conflict with the function connect
     if (connect != 0) {
-        perror("Connection error: bind failed\n");
+        perror("Connection error: bind failed");
         return connect;
     }
     printf("Socket named\n");
@@ -155,20 +157,31 @@ int send_all(int socket_sender, char *message, struct client *tab_client,sem_t  
     return 0;
 }
 
-int get_nickname(struct client * tab_client,int dS, char **pseudo, int nb_client_max, sem_t semaphore) {
+/**
+ * Retrieves the nickname of a client based on their socket descriptor.
+ *
+ * @param tab_client The array of client structures.
+ * @param dS The socket descriptor of the client.
+ * @param pseudo A pointer to a string to store the client's nickname.
+ * @param nb_client_max The maximum number of clients.
+ * @param semaphore The semaphore used for synchronization.
+ * @return 0 if the nickname was successfully retrieved, -1 otherwise.
+ */
+int get_nickname(struct client * tab_client, int dS, char **pseudo, int nb_client_max, sem_t semaphore) {
     int i = 0;
     int res = -1;
     sem_wait(&semaphore);
     while (i<nb_client_max && res == -1) {
         if (tab_client[i].socket == dS) {
-            strcpy(*pseudo,tab_client[i].nickname);
+            strcpy(*pseudo, tab_client[i].nickname);
             strcat(*pseudo," : ");
             res = 0;
         }
         i++;
     }
+    sem_post(&semaphore);
     return res;
-} 
+}
 
 /**
  * Deletes a client from the client array.
@@ -213,15 +226,20 @@ int delete_client (int dS, struct client *tab_client,sem_t semaphore) {
     return res;
 }
 
+/**
+ * Retrieves the socket descriptor (dS) associated with a given username from an array of clients.
+ *
+ * @param username The username to search for.
+ * @param tab_client The array of clients.
+ * @param semaphore The semaphore used for synchronization.
+ * @return The socket descriptor (dS) associated with the username, or -1 if not found.
+ */
 int get_dS(char * username,struct client* tab_client, sem_t semaphore) {
     int res = -1;
     int i = 0;
     sem_wait(&semaphore);
     while (i<10 && res == -1) {
-        if (tab_client[i].socket != -1) {
-            printf("Il y a l'utilisateur : %s qui a le dS : %d \n",tab_client[i].nickname,tab_client[i].socket);
-        } 
-        if ( strcmp(username,tab_client[i].nickname) == 0) {
+        if (strcmp(username, tab_client[i].nickname) == 0) {
             res = tab_client[i].socket;
         }
         i++;
@@ -230,31 +248,78 @@ int get_dS(char * username,struct client* tab_client, sem_t semaphore) {
     return res;
 }
 
+/**
+ * Sends a private message to a specific user.
+ *
+ * @param username The username of the recipient.
+ * @param message The message to be sent.
+ * @param tab_client An array of client structures.
+ * @param semaphore The semaphore used for synchronization.
+ * @return Returns 1 on success, -1 on failure.
+ */
+int whisper(int dS, char * username, char * message, struct client *tab_client, sem_t semaphore) {
 
-void whisper(char * username, char * message, struct client *tab_client, sem_t semaphore) {
-    printf("Passage dans whisper \n");
-    int req;
-    int dS_cible = get_dS(username,tab_client,semaphore);
-    printf("Le dS cible vaut : %d \n",dS_cible);
+    int dS_cible = get_dS(username, tab_client, semaphore);
     if (dS_cible == -1) {
-        perror("Utilisateur introuvable");
+        printf("Unknown user\n");
+        return -1;
     }
-    else {
-        int res = send_message(dS_cible, message);
-        if (res < 0) {
-            perror("Error sending the message");
-        }
+
+    char * sender = (char*) malloc(sizeof(char));
+    int code = get_nickname(tab_client, dS, &sender, NB_CLIENT_MAX, semaphore);
+    if (code == -1) {
+        printf("Error getting the nickname\n");
+        return -1;
     }
+    sender[strcspn(sender, " :")] = '\0'; //Remove the " :" from the nickname
+
+    char * coloredmsg = (char*) malloc(strlen(message) + strlen(sender) + 32 + 5); //32 is the length of the string "{sender} vous chuchotte : " + colors and 5 is for the null terminator + possible mistakes
+    if (coloredmsg == NULL) {
+        printf("Error allocating memory\n");
+        return -1;
+    }
+
+    sprintf(coloredmsg,"\033[1;31m%s vous chuchotte : %s\033[0m", sender, message);//Color the message in red
+    printf("Message privé de %s à %s est : \"%s\" \n", sender, username, message);
+
+    int res = send_message(dS_cible, coloredmsg);
+    if (res < 0) {
+        printf("Error sending the message\n");
+    }
+
+    free(coloredmsg);
+    free(sender);
+    return res;
 }
 
+/**
+ * Function to kick a client from the server.
+ * 
+ * @param username The username of the client to be kicked.
+ * @param tab_client The array of client structures.
+ * @param semaphore The semaphore used for synchronization.
+ * @return 0 on success, -1 on failure.
+ */
 int kick(char * username, struct client *tab_client, sem_t semaphore) {
     int dS_cible = get_dS(username,tab_client,semaphore);
-    delete_client(dS_cible, tab_client, semaphore);
+    if (dS_cible == -1) {
+        printf("Unknown user\n");
+        return -1;
+    }
+    int deleteCheck = delete_client(dS_cible, tab_client, semaphore);
+    if (deleteCheck != 0) {
+        printf("Error kicking the client\n");
+    }
+    return deleteCheck;
 }
 
-
+/**
+ * Function to display the contents of a file to a client.
+ * 
+ * @param descripteur The descriptor of the client.
+ * @return 0 on success, -1 on failure.
+ */
 int man(int descripteur) {
-    puts("Passage dans la fonction man");
     FILE* fichier = NULL;
     char chaine[100] = "";
     fichier = fopen("commande.txt", "r");
@@ -268,38 +333,67 @@ int man(int descripteur) {
     return 0;
 }
 
+/**
+ * Shuts down the server and sends a message to all connected clients.
+ * 
+ * @param dS The server socket descriptor.
+ * @param tab_client An array of client structures.
+ * @param semaphore The semaphore used for synchronization.
+ * @return 1 if the shutdown is successful, -1 otherwise.
+ */
 int shutdownserv(int dS, struct client *tab_client, sem_t semaphore) {
     sem_wait(&semaphore);
     for (int i = 0; i<10; i++) {
         if (tab_client[i].socket != -1) {
             int res = send_message(tab_client[i].socket, "Le serveur va s'arrêter\n");
             if (res < 0) {
-                perror("Error sending the message");
+                puts("Error sending the message");
+                return -1;
             }
         }
     }
     sem_post(&semaphore);
     close(dS);
-    exit(0);
     return 1;
 }
 
+/**
+ * Sends a list of connected clients to a specific client.
+ * 
+ * @param tab_client An array of client structures.
+ * @param semaphore The semaphore used for synchronization.
+ * @param descripteur The client socket descriptor.
+ * @return 1 if the list is successfully sent, -1 otherwise.
+ */
 int list(struct client *tab_client, sem_t semaphore, int descripteur) {
     sem_wait(&semaphore);
     for (int i = 0; i<10; i++) {
         if (tab_client[i].socket != -1) {
             char * message = tab_client[i].nickname;
             int res = send_message(descripteur, message);
+            if (res < 0) {
+                puts("Error sending the message");
+                return -1;
+            }
         }
     }
     sem_post(&semaphore);
     return 1;
 }
 
+/**
+ * Removes a client from the server.
+ * 
+ * @param descripteur The client socket descriptor.
+ * @param tab_client An array of client structures.
+ * @param semaphore The semaphore used for synchronization.
+ * @return 1 if the client is successfully removed, -1 otherwise.
+ */
 int quit (int descripteur, struct client *tab_client, sem_t semaphore) {
     int res = delete_client(descripteur, tab_client, semaphore);
-    if (res == 0) {
-        puts("Suppression réussi");
+    if (res != 0) {
+        puts("Error deleting the client");
+        return -1;
     }
     return 1;
 }
@@ -322,7 +416,7 @@ int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descript
         }else if (strcmp(tok, "whisper") == 0) {
             tok = strtok(NULL, " " );
             char * message = strtok(NULL, "\0");
-            whisper(tok, message, tab_client, semaphore);
+            whisper(descripteur, tok, message, tab_client, semaphore);
             return 1;
         }else if (strcmp(tok, "close") == 0) {
             return 0; //  0 = need to deconnect
@@ -353,6 +447,13 @@ void * discussion (void * arg) {
     char *message = NULL; //The message received. Initialized to NULL to avoid recv_message to free a non-allocated memory
     int dS = argument->descripteur;
 
+    char * sender = (char*) malloc(sizeof(char));
+    int code = get_nickname(argument->tab_client, dS, &sender, NB_CLIENT_MAX, argument->semaphore_id);
+    if (code == -1) {
+        perror("Error getting the nickname");
+    }
+    sender[strcspn(sender, " :")] = '\0'; //Remove the " :" from the nickname
+
     //---The conversation loop---
 
     while (conversation) {
@@ -362,17 +463,17 @@ void * discussion (void * arg) {
                 perror("Error receiving the message");
                 int resultat = delete_client(dS, argument->tab_client, argument->semaphore_id);
                 if (resultat == 0) {
-                puts("Suppression réussi");}
+                puts("Suppression réussie");}
             }
-            
-            puts("Deconnexion d'un client");
+
+            printf("\033[94m%s\033[0m s'est déconnecté\n", sender);
 
             conversation = 0;
         }
         else {
             printf("Message recu : %s \n",message);
             char * pseudo = (char*) malloc(sizeof(char));// Variabe to store nickname
-            int code = get_nickname(argument->tab_client,dS,&pseudo,argument->Nb_client_max,argument->semaphore_id); //Here we get the nickname of the sender to add it to the message
+            int code = get_nickname(argument->tab_client, dS, &pseudo, argument->Nb_client_max, argument->semaphore_id); //Here we get the nickname of the sender to add it to the message
             int rep = analyse(message, argument->tab_client, argument->semaphore_id, dS);
             if (rep == 2) { //Case no command
                 strcat(pseudo,message);
@@ -509,7 +610,7 @@ void * get_client (void * arg) {
         else if (res == 0) {
             res = set_nickname(args->tab_client, args->Nb_client_max, dSClient, args->semaphore_id);
             if (res == -1) {
-                perror("Error getting the nickname");
+                perror("set : Error getting the nickname");
                 close(dSClient);
             }
             pthread_t tid;
@@ -534,8 +635,6 @@ int main(int argc, char *argv[]) {
         return -1;
     }
     printf("Start program\n");
-    //There is the const that define the maximum the number of client handled by the server
-    const int NB_CLIENT_MAX = 10;
 
     short running = 1;
 
