@@ -221,34 +221,6 @@ void * discussion (void * arg) {
     char *message = NULL; //The message received. Initialized to NULL to avoid recv_message to free a non-allocated memory
     int dS = argument->descripteur;
 
-    //---The first message is the nickname of the client---
-
-    int send = send_message(dS, "Entrez votre pseudo : ");
-    if (send < 0) {
-        perror("Error sending the nickname request");
-        exit(0);
-    }
-
-    int res = recv_message(dS, &message);
-    if (res == 0) {
-        puts("Annulation de connexion d'un client");
-        int resultat = delete_client(dS, argument->tab_of_client, argument->semaphore_id);
-        close(dS);
-        pthread_exit(NULL);
-    }
-    else if (res < 0) {
-        perror("Error receiving the nickname");
-        exit(0);
-    }
-    else {
-        printf("Pseudo recu : %s \n",message);
-        for (int i = 0; i<NB_CLIENT_MAX; i++) {
-            if (argument->tab_of_client[i].socket == dS) {
-                argument->tab_of_client[i].nickname = message;
-            }
-        }
-    }
-
     //---The conversation loop---
 
     while (conversation) {
@@ -352,6 +324,11 @@ int set_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t sem
     for (int i = 0; i<Nb_client_max; i++) {
         if (tab_client[i].socket == dS) {
             tab_client[i].nickname = message;
+        }
+        int verif = send_message(dS, "ok"); //send a message to the client to confirm the nickname
+        if (verif == -1) {
+            perror("Error confirming the nickname");
+            return -1;
         }
     }
 
@@ -483,7 +460,7 @@ int main(int argc, char *argv[]) {
     }
     printf("Start program\n");
     //There is the const that define the maximum the number of client handled by the server
-    //const int NB_CLIENT_MAX = 10; -> MAINTENANT DANS LE utilitaire.h
+    const int NB_CLIENT_MAX = 10;
 
     short running = 1;
 
