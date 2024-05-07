@@ -191,8 +191,8 @@ int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
     }
 
     while (res == -1) {
-        if (tab_of_client[i].socket == dS) {
-            tab_of_client[i].socket = -1;
+        if (tab_client[i].socket == dS) {
+            tab_client[i].socket = -1;
             res = 0;
         }
         i = i+1;
@@ -403,7 +403,7 @@ int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descript
     }else {return 2;}
 }
 
-void whisper(char * username, char * message, struct client *tab_client, int semaphore) {
+void whisper(char * username, char * message, struct client *tab_client, sem_t semaphore) {
     semaphore_wait(semaphore);
     int req;
     for (int i = 0; i<10; i++) {
@@ -418,10 +418,10 @@ void whisper(char * username, char * message, struct client *tab_client, int sem
             perror('Utilisateur introuvable');
         }
     }
-    semaphore_unlock(semaphore);
+    sem_post(&semaphore);
 }
 
-int kick(char * username, struct client *tab_client, int semaphore) {
+int kick(char * username, struct client *tab_client, sem_t semaphore) {
     for (int i = 0; i<10; i++) {
         if (tab_client[i].nickname == username);
         }
@@ -434,7 +434,7 @@ int man(int descripteur) {
     fichier = fopen("commande.txt", "r");
     if (fichier != NULL) {
         while (fgets(chaine, 100, fichier) != NULL) {
-            char message[] = chaine;
+            char *message = chaine;
             send_message(descripteur, message);
         }
         fclose(fichier);
@@ -442,7 +442,9 @@ int man(int descripteur) {
     return 0;
 }
 
-int get_dS(char * username) {}
+int get_dS(char * username) {
+    return 1;
+}
 
 /**
  * @brief The main function of the server program.
