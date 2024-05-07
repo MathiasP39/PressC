@@ -235,10 +235,20 @@ void * discussion (void * arg) {
             conversation = 0;
         }
         else {
+            int rep = analyse(arg, argument->tab_client, argument->semaphore_id, argument->descripteur);
+            if (rep == 2) {
+                res = send_all(dS, message, argument->tab_client, argument->semaphore_id, argument->Nb_client_max); 
+            }else if (rep == 0) {
+                pthread_exit(0);
+            }else if (rep == -1){
+                perror('Commande inconnue');
+            }
+
             printf("Message recu : %s \n",message);
             char * pseudo = (char*) malloc(sizeof(char));
             int code = get_nickname(argument->tab_of_client,dS,&pseudo,argument->Nb_client_max,argument->semaphore_id);
             strcat(pseudo,message);
+            analyse(arg, argument->tab_of_client, argument->semaphore_id);
             res = send_all(dS, pseudo, argument->tab_of_client, argument->semaphore_id, argument->Nb_client_max); 
         }
     }
@@ -440,6 +450,11 @@ int man(int descripteur) {
 int get_dS(char * username) {
     return 1;
 }
+
+void close_serv() {
+
+}
+int get_dS(char * username) {}
 
 /**
  * @brief The main function of the server program.
