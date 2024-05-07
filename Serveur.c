@@ -377,7 +377,7 @@ void * get_client (void * arg) {
     }
 } 
  
-int analyse(char * arg, struct client *tab_client, int semaphore, int descripteur) {
+int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descripteur) {
     if (arg[0] == '/') {
         char *tok = strtok(arg+1, " ");
         if (strcmp(tok, 'kick')) {
