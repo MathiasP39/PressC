@@ -28,7 +28,6 @@ struct thread_argument {
     int descripteur;        /**< The file descriptor of the client connection */
     struct client *tab_client;     /**< An array of client descriptors */
     sem_t semaphore_id;
-    struct client *tab_of_client;     /**< An array of clients */
     int Nb_client_max;
 };
 
@@ -157,7 +156,6 @@ int send_all(int socket_sender, char *message, struct client *tab_client,sem_t s
 }
 
 int get_nickname(struct client * tab_client,int dS, char **pseudo, int nb_client_max, sem_t semaphore) {
-    printf("Passage dans Nickname");
     int i = 0;
     int res = -1;
     sem_wait(&semaphore);
@@ -186,7 +184,7 @@ int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
     int i = 0;
     int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
     if (waitCheck == -1) {
-        perror("semaphore_wait error : semop failed\n");
+        perror("sem_wait error : semop failed\n");
         return -1;
     }
 
@@ -206,6 +204,87 @@ int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
 
     close(dS);
     return res;
+}
+
+int get_dS(char * username,struct client* tab_client, sem_t semaphore) {
+    int res = -1;
+    int i = 0;
+    sem_wait(&semaphore);
+    while (i<10 && res == -1) {
+        if ( strcmp(username,tab_client[i].nickname) == 0) {
+            res = tab_client->socket;
+        }
+        i++;
+    }
+    sem_post(&semaphore);
+    return res;
+}
+
+
+void whisper(char * username, char * message, struct client *tab_client, sem_t semaphore) {
+    int req;
+    int dS_cible = get_dS(username,tab_client,semaphore);
+    if (dS_cible == -1) {
+        perror("Utilisateur introuvable");
+    }
+    else {
+        int res = send_message(get_dS(username,tab_client,semaphore), message);
+        if (res < 0) {
+            perror("Error sending the message");
+        }
+    }
+}
+
+int kick(char * username, struct client *tab_client, sem_t semaphore) {
+    for (int i = 0; i<10; i++) {
+        if (tab_client[i].nickname == username)
+            delete_client(get_dS(username,tab_client,semaphore), tab_client, semaphore);
+        }
+    }
+
+
+int man(int descripteur) {
+    puts("Passage dans la fonction man");
+    FILE* fichier = NULL;
+    char chaine[100] = "";
+    fichier = fopen("commande.txt", "r");
+    if (fichier != NULL) {
+        while (fgets(chaine, 100, fichier) != NULL) {
+            char *message = chaine;
+            send_message(descripteur, message);
+        }
+        fclose(fichier);
+    }
+    return 0;
+}
+
+/*
+This function is in charge of detection of commands in a message
+List of case value of return : 
+    - 1 if nothing to do (/kick)
+    - 2 if there is no command
+    - -1 if there is a problem 
+    - 0 if the user needs to be disconnected
+*/
+int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descripteur) {
+    if (arg[0] == '/') {
+        char *tok = strtok(arg+1, " ");
+        if (strcmp(tok, "kick") == 0) {
+            tok = strtok(NULL, " ");
+            kick(tok, tab_client, semaphore);
+            return 1; // Nothing to do
+        }else if (strcmp(tok, "whisper") == 0) {
+            tok = strtok(NULL, " " );
+            char * message = strtok(NULL, "\0");
+            whisper(tok, message, tab_client, semaphore);
+            return 1;
+        }else if (strcmp(tok, "close") == 0) {
+            return 0; //  0 = need to deconnect
+        }else if (strcmp(tok, "man") == 0) {
+            man(descripteur);
+            return 1;
+        }
+    }else {return 2;}
 }
 
 /**
@@ -231,31 +310,21 @@ void * discussion (void * arg) {
         }
         else if (res == 0 || strcmp(message,"fin") == 0) {
             puts("Deconnexion d'un client");
-            int resultat = delete_client(dS, argument->tab_of_client, argument->semaphore_id);
+            int resultat = delete_client(dS, argument->tab_client, argument->semaphore_id);
             conversation = 0;
         }
         else {
-            int rep = analyse(arg, argument->tab_client, argument->semaphore_id, argument->descripteur);
-            if (rep == 2) {
-                res = send_all(dS, message, argument->tab_client, argument->semaphore_id, argument->Nb_client_max); 
-            }else if (rep == 0) {
-                pthread_exit(0);
-            }else if (rep == -1){
-                perror('Commande inconnue');
-            }
-
             printf("Message recu : %s \n",message);
-            char * pseudo = (char*) malloc(sizeof(char));
-            int code = get_nickname(argument->tab_of_client,dS,&pseudo,argument->Nb_client_max,argument->semaphore_id);
-            strcat(pseudo,message);
-            analyse(arg, argument->tab_of_client, argument->semaphore_id);
-            res = send_all(dS, pseudo, argument->tab_of_client, argument->semaphore_id, argument->Nb_client_max); 
-            if (rep == 2) {
-                res = send_all(dS, message, argument->tab_client, argument->semaphore_id, argument->Nb_client_max); 
-            }else if (rep == 0) {
+            char * pseudo = (char*) malloc(sizeof(char));// Variabe to store nickname
+            int code = get_nickname(argument->tab_client,dS,&pseudo,argument->Nb_client_max,argument->semaphore_id); //Here we get the nickname of the sender to add it to the message
+            int rep = analyse(message, argument->tab_client, argument->semaphore_id, argument->descripteur);
+            if (rep == 2) { //Case no command
+                strcat(pseudo,message);
+                res = send_all(dS,pseudo, argument->tab_client, argument->semaphore_id, argument->Nb_client_max); 
+            }else if (rep == 0) { //Case command /quit 
                 pthread_exit(0);
             }else if (rep == -1){
-                perror('Commande inconnue');
+                perror("Error");
             }
         }
     }
@@ -307,7 +376,7 @@ int set_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t sem
 
     int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
     if (waitCheck == -1) {
-        perror("semaphore_wait error");
+        perror("sem_wait error");
         return compt;
     }
 

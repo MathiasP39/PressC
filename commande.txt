@@ -1,4 +1,7 @@
-/whisper
+Voici le manuel utilisateur, il contient les différentes commandes de la messagerie :
+Elles sont à utilisé en début de message
+
+/whisper : permet d'envoyer un message à une personne en particulier. Exemple : /whisper <Pseudo> <message>
 /kick 
 /block
 /help
