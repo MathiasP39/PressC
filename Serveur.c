@@ -9,6 +9,15 @@
 #include <sys/sem.h>
 #include <semaphore.h>
 #include "utilitaire.h"
+#include <signal.h>
+#define NB_CLIENT_MAX 10
+
+
+struct client static *tab_client;
+
+sem_t static semaphore_tableau;
+
+sem_t static semaphore_nb_client;
 
 
 //Command to launch this program : ./Serveur port
@@ -142,8 +151,8 @@ int connect_to_client(struct sockaddr_in adress, int descripteur) {
  * @param tab_client The array of client socket descriptors.
  */
 int send_all(int socket_sender, char *message, struct client *tab_client,sem_t  semaphore,int size) {
-    sem_wait(&semaphore);
-    for (int i = 0; i<10; i++) {
+    sem_wait(&semaphore_tableau);
+    for (int i = 0; i<NB_CLIENT_MAX; i++) {
         if (tab_client[i].socket != -1 && tab_client[i].socket != socket_sender) {
             int res = send_message(tab_client[i].socket, message);
             if (res < 0) {
@@ -151,15 +160,15 @@ int send_all(int socket_sender, char *message, struct client *tab_client,sem_t  
             }
         }
     }
-    sem_post(&semaphore);
+    sem_post(&semaphore_tableau);
     return 0;
 }
 
 int get_nickname(struct client * tab_client,int dS, char **pseudo, int nb_client_max, sem_t semaphore) {
     int i = 0;
     int res = -1;
-    sem_wait(&semaphore);
-    while (i<nb_client_max && res == -1) {
+    sem_wait(&semaphore_tableau);
+    while (i<NB_CLIENT_MAX && res == -1) {
         if (tab_client[i].socket == dS) {
             strcpy(*pseudo,tab_client[i].nickname);
             strcat(*pseudo," : ");
@@ -167,6 +176,7 @@ int get_nickname(struct client * tab_client,int dS, char **pseudo, int nb_client
         }
         i++;
     }
+    sem_post(&semaphore_tableau);
     return res;
 } 
 
@@ -182,13 +192,13 @@ int get_nickname(struct client * tab_client,int dS, char **pseudo, int nb_client
 int delete_client (int dS, struct client *tab_client,sem_t semaphore) {
     int res = -1;
     int i = 0;
-    int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
+    int waitCheck = sem_wait(&semaphore_tableau); //wait for the semaphore to be available
     if (waitCheck == -1) {
         perror("sem_wait error : semop failed\n");
         return -1;
     }
 
-    while (res == -1 && i<10) {
+    while (res == -1 && i< NB_CLIENT_MAX) {
         if (tab_client[i].socket == dS) {
             tab_client[i].socket = -1;
             tab_client[i].nickname = "";
@@ -197,7 +207,7 @@ int delete_client (int dS, struct client *tab_client,sem_t semaphore) {
         i = i+1;
     }
 
-    int unlockCheck = sem_post(&semaphore); //unlock the semaphore previously locked
+    int unlockCheck = sem_post(&semaphore_tableau); //unlock the semaphore previously locked
     if (unlockCheck == -1) {
         perror("sem_post error : semop failed\n");
         return -1;
@@ -216,8 +226,8 @@ int delete_client (int dS, struct client *tab_client,sem_t semaphore) {
 int get_dS(char * username,struct client* tab_client, sem_t semaphore) {
     int res = -1;
     int i = 0;
-    sem_wait(&semaphore);
-    while (i<10 && res == -1) {
+    sem_wait(&semaphore_tableau);
+    while (i<NB_CLIENT_MAX && res == -1) {
         if (tab_client[i].socket != -1) {
             printf("Il y a l'utilisateur : %s qui a le dS : %d \n",tab_client[i].nickname,tab_client[i].socket);
         } 
@@ -226,7 +236,7 @@ int get_dS(char * username,struct client* tab_client, sem_t semaphore) {
         }
         i++;
     }
-    sem_post(&semaphore);
+    sem_post(&semaphore_tableau);
     return res;
 }
 
@@ -269,8 +279,8 @@ int man(int descripteur) {
 }
 
 int shutdownserv(int dS, struct client *tab_client, sem_t semaphore) {
-    sem_wait(&semaphore);
-    for (int i = 0; i<10; i++) {
+    sem_wait(&semaphore_tableau);
+    for (int i = 0; i<NB_CLIENT_MAX; i++) {
         if (tab_client[i].socket != -1) {
             int res = send_message(tab_client[i].socket, "Le serveur va s'arrêter\n");
             if (res < 0) {
@@ -278,28 +288,28 @@ int shutdownserv(int dS, struct client *tab_client, sem_t semaphore) {
             }
         }
     }
-    sem_post(&semaphore);
+    sem_post(&semaphore_tableau);
     close(dS);
     exit(0);
     return 1;
 }
 
 int list(struct client *tab_client, sem_t semaphore, int descripteur) {
-    sem_wait(&semaphore);
-    for (int i = 0; i<10; i++) {
+    sem_wait(&semaphore_tableau);
+    for (int i = 0; i<NB_CLIENT_MAX; i++) {
         if (tab_client[i].socket != -1) {
             char * message = tab_client[i].nickname;
             int res = send_message(descripteur, message);
         }
     }
-    sem_post(&semaphore);
+    sem_post(&semaphore_tableau);
     return 1;
 }
 
 int quit (int descripteur, struct client *tab_client, sem_t semaphore) {
     int res = delete_client(descripteur, tab_client, semaphore);
     if (res == 0) {
-        puts("Suppression réussi");
+        puts("Suppression réussie");
     }
     return 1;
 }
@@ -402,7 +412,7 @@ void * discussion (void * arg) {
 int add_client(struct client *tab_client, int size, int dS, sem_t semaphore) {
     int res = -1;
     int i = 0;
-    sem_wait(&semaphore);
+    sem_wait(&semaphore_tableau);
     while (res == -1 && i < size) {
         if (tab_client[i].socket == -1) {
             tab_client[i].socket = dS;
@@ -410,7 +420,7 @@ int add_client(struct client *tab_client, int size, int dS, sem_t semaphore) {
         }
         ++i;
     }
-    sem_post(&semaphore);
+    sem_post(&semaphore_t);
     return res;
 }
 
@@ -429,7 +439,7 @@ int set_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t sem
     int i = 0;
     char *message = NULL;
 
-    int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
+    int waitCheck = sem_wait(&semaphore_tableau); //wait for the semaphore to be available
     if (waitCheck == -1) {
         perror("sem_wait error");
         return compt;
@@ -474,7 +484,7 @@ int set_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t sem
         return -1;
     }
 
-    int unlockCheck = sem_post(&semaphore); //unlock
+    int unlockCheck = sem_post(&semaphore_tableau); //unlock
     if (unlockCheck == -1) {
         perror("semaphore_unlock error");
         return -1;
@@ -495,18 +505,17 @@ int set_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t sem
  */
 void * get_client (void * arg) {
     struct arg_get_client *args = (struct arg_get_client *) arg;
-    sem_t semaphore = args->sem_nb_client;
     while (1) {
         struct sockaddr_in aC ;
         int dSClient = connect_to_client(aC,args->dS);
-        int res = sem_trywait(&semaphore);
-        res = add_client(args->tab_client, args->Nb_client_max, dSClient, args->semaphore_id);
+        int res = sem_trywait(&semaphore_nb_client);
         if (res == -1) {
             char message[] = "You can't connect there is already too many people connected, retry later";
             send_message(dSClient, message);
             close(dSClient);
         }
         else if (res == 0) {
+            res = add_client(args->tab_client, args->Nb_client_max, dSClient, args->semaphore_id);
             res = set_nickname(args->tab_client, args->Nb_client_max, dSClient, args->semaphore_id);
             if (res == -1) {
                 perror("Error getting the nickname");
@@ -518,6 +527,11 @@ void * get_client (void * arg) {
         }
     }
 } 
+
+void extinction () {
+    puts("Tu n'es plus raciste");
+    exit(0);
+}
 
 /**
  * @brief The main function of the server program.
@@ -535,7 +549,6 @@ int main(int argc, char *argv[]) {
     }
     printf("Start program\n");
     //There is the const that define the maximum the number of client handled by the server
-    const int NB_CLIENT_MAX = 10;
 
     short running = 1;
 
@@ -543,6 +556,8 @@ int main(int argc, char *argv[]) {
     if (dS == -1) {
         return -1;
     }
+
+    signal(SIGINT ,extinction);
 
     struct sockaddr_in adresse = param_socket_adresse(argv[1]);
 
