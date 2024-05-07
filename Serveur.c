@@ -450,7 +450,7 @@ int set_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t sem
         else {
             printf("Pseudo recu : %s \n",message);
             for (int i = 0; i<Nb_client_max; i++) {
-                if (tab_client[i].nickname == message) {
+                if (strcmp(tab_client[i].nickname,message) == 0) {
                     int sendCheck = send_message(dS, "Pseudo indisponible, veuillez en choisir un autre :\n");
                     if (sendCheck == -1) {
                         perror("Error sending the message");
