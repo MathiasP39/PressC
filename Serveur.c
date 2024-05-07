@@ -223,6 +223,7 @@ void * discussion (void * arg) {
     //---The conversation loop---
 
     while (conversation) {
+        
         int res =  recv_message(dS, &message);
         if (res < 0) {
             perror("Error receiving the message");
@@ -375,17 +376,21 @@ void * get_client (void * arg) {
         }
     }
 } 
-
-void analyse(char * arg, int * tab_client, int semaphore) {
+ 
+int analyse(char * arg, int * tab_client, int semaphore) {
     if (arg[0] == '/') {
         char *tok = strtok(arg+1, " ");
-        if (tok == 'kick') {
+        if (strcmp(tok, 'kick')) {
             tok = strtok(NULL, ' ');
-            kick(tok, tab_client, );
-        }else if (tok == 'kick') {
+            kick(tok, tab_client, semaphore);
+            return 1; // Nothing to do
+        }else if (strcmp(tok, 'whisper')) {
             tok = strtok(NULL, ' ');
             char * message = strtok(NULL, '\0');
             whisper(tok, message, tab_client, semaphore);
+            return 1;
+        }else if (strcmp(tok, 'close')) {
+            return 0; //  0 = need to deconnect
         }
     }
 }
@@ -403,13 +408,18 @@ void whisper(char * username, char * message, int * tab_client, int semaphore) {
     semaphore_unlock(semaphore);
 }
 
-void kick(char * username, int * tab_client, int semaphore, int dS) {
+int kick(char * username, int * tab_client, int semaphore) {
     for (int i = 0; i<10; i++) {
         if (tab_client[i] == username) {
-            
+            delete_client(get_dS(username), tab_client, semaphore);
         }
     }
 }
+
+void close_serv() {
+
+}
+int get_dS(char * username) {}
 
 /**
  * @brief The main function of the server program.
