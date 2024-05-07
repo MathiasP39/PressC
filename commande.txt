@@ -1,11 +1,10 @@
 Voici le manuel utilisateur, il contient les différentes commandes de la messagerie :
 Elles sont à utilisé en début de message
 
-/whisper : permet d'envoyer un message à une personne en particulier. Exemple : /whisper <Pseudo> <message>
-/kick : permet de deconnecter un client connecté au serveur . Exemple : /kick <Pseudo>
-/block
-/help
-/list
-/quit
-/shutdown
+/whisper : permet d'envoyer un message à une personne en particulier. Exemple : /whisper <Pseudo> <message> !
+/kick : permet de deconnecter un client connecté au serveur . Exemple : /kick <Pseudo> !
+/man : Donne la liste des commandes existantes !
+/list : Donne la liste des clients connectés (username, dS) !
+/quit : Déconnecte l'utilisateur utilisant la commande du serveur
+/shutdownserv : ferme toutes les sockets connectée !
 

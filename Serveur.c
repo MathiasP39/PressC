@@ -249,7 +249,7 @@ void whisper(char * username, char * message, struct client *tab_client, sem_t s
 int kick(char * username, struct client *tab_client, sem_t semaphore) {
     int dS_cible = get_dS(username,tab_client,semaphore);
     delete_client(dS_cible, tab_client, semaphore);
-    }
+}
 
 
 int man(int descripteur) {
@@ -265,6 +265,42 @@ int man(int descripteur) {
         fclose(fichier);
     }
     return 0;
+}
+
+int shutdownserv(int dS, struct client *tab_client, sem_t semaphore) {
+    sem_wait(&semaphore);
+    for (int i = 0; i<10; i++) {
+        if (tab_client[i].socket != -1) {
+            int res = send_message(tab_client[i].socket, "Le serveur va s'arrêter\n");
+            if (res < 0) {
+                perror("Error sending the message");
+            }
+        }
+    }
+    sem_post(&semaphore);
+    close(dS);
+    exit(0);
+    return 1;
+}
+
+int list(struct client *tab_client, sem_t semaphore, int descripteur) {
+    sem_wait(&semaphore);
+    for (int i = 0; i<10; i++) {
+        if (tab_client[i].socket != -1) {
+            char * message = tab_client[i].nickname;
+            int res = send_message(descripteur, message);
+        }
+    }
+    sem_post(&semaphore);
+    return 1;
+}
+
+int quit (int dS, struct client *tab_client, sem_t semaphore) {
+    int res = delete_client(dS, tab_client, semaphore);
+    if (res == 0) {
+        puts("Suppression réussi");
+    }
+    return res;
 }
 
 /*
@@ -292,6 +328,13 @@ int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descript
         }else if (strcmp(tok, "man") == 0) {
             man(descripteur);
             return 1;
+        }else if (strcmp(tok, "list") == 0) {
+            list(tab_client, semaphore, descripteur);
+            return 1;
+        }else if (strcmp(tok, "quit") == 0) {
+            return quit(descripteur, tab_client, semaphore);
+        }else if (strcmp(tok, "shutdownserv") == 0) {
+            shutdownserv(descripteur, tab_client, semaphore);
         }
     }else {return 2;}
 }
@@ -334,8 +377,9 @@ void * discussion (void * arg) {
                 strcat(pseudo,message);
                 res = send_all(dS,pseudo, argument->tab_client, argument->semaphore_id, argument->Nb_client_max); 
             }else if (rep == 0) { //Case command /quit 
-                pthread_exit(0);
+                shutdownserv(dS, argument->tab_client, argument->semaphore_id);
             }else if (rep == -1){
+                puts("Error in the command");
                 perror("Error");
             }
         }
@@ -368,6 +412,8 @@ int add_client(struct client *tab_client, int size, int dS, sem_t semaphore) {
     sem_post(&semaphore);
     return res;
 }
+
+
 
 /**
  * Function to get the nickname of a client and store it in the client structure.
