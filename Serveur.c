@@ -191,6 +191,7 @@ int delete_client (int dS, struct client *tab_client,sem_t semaphore) {
     while (res == -1 && i<10) {
         if (tab_client[i].socket == dS) {
             tab_client[i].socket = -1;
+            tab_client[i].nickname = "";
             res = 0;
         }
         i = i+1;
@@ -201,7 +202,7 @@ int delete_client (int dS, struct client *tab_client,sem_t semaphore) {
         perror("sem_post error : semop failed\n");
         return -1;
     }
-    send_message(dS,"Vous avez été kick");
+    send_message(dS,"Vous avez été déconnecté\n");
     int code = close(dS);
     if (code == 0) {
         puts("Fermeture de la socket réussite");
@@ -295,12 +296,12 @@ int list(struct client *tab_client, sem_t semaphore, int descripteur) {
     return 1;
 }
 
-int quit (int dS, struct client *tab_client, sem_t semaphore) {
-    int res = delete_client(dS, tab_client, semaphore);
+int quit (int descripteur, struct client *tab_client, sem_t semaphore) {
+    int res = delete_client(descripteur, tab_client, semaphore);
     if (res == 0) {
         puts("Suppression réussi");
     }
-    return res;
+    return 1;
 }
 
 /*
@@ -333,7 +334,7 @@ int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descript
             return 1;
         }else if (strcmp(tok, "quit") == 0) {
             return quit(descripteur, tab_client, semaphore);
-        }else if (strcmp(tok, "shutdownserv") == 0) {
+        }else if (strcmp(tok, "shutdown") == 0) {
             shutdownserv(descripteur, tab_client, semaphore);
         }
     }else {return 2;}
@@ -450,7 +451,7 @@ int set_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t sem
         else {
             printf("Pseudo recu : %s \n",message);
             for (int i = 0; i<Nb_client_max; i++) {
-                if (tab_client[i].nickname == message) {
+                if (strcmp(tab_client[i].nickname,message) == 0) {
                     int sendCheck = send_message(dS, "Pseudo indisponible, veuillez en choisir un autre :\n");
                     if (sendCheck == -1) {
                         perror("Error sending the message");
