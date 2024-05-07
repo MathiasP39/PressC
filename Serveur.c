@@ -25,9 +25,9 @@
  * This structure contains the file descriptor of the client connection and an array of client descriptors.
  */
 struct thread_argument {
-    int descripteur;        /**< The file descriptor of the client connection */ 
+    int descripteur;        /**< The file descriptor of the client connection */
+    struct client *tab_client;     /**< An array of client descriptors */
     sem_t semaphore_id;
-    struct client *tab_of_client;     /**< An array of clients */
     int Nb_client_max;
 };
 
@@ -141,7 +141,7 @@ int connect_to_client(struct sockaddr_in adress, int descripteur) {
  * @param message The message to send.
  * @param tab_client The array of client socket descriptors.
  */
-int send_all(int socket_sender, char *message, struct client *tab_client,sem_t semaphore,int size) {
+int send_all(int socket_sender, char *message, struct client *tab_client,sem_t  semaphore,int size) {
     sem_wait(&semaphore);
     for (int i = 0; i<10; i++) {
         if (tab_client[i].socket != -1 && tab_client[i].socket != socket_sender) {
@@ -156,7 +156,6 @@ int send_all(int socket_sender, char *message, struct client *tab_client,sem_t s
 }
 
 int get_nickname(struct client * tab_client,int dS, char **pseudo, int nb_client_max, sem_t semaphore) {
-    printf("Passage dans Nickname");
     int i = 0;
     int res = -1;
     sem_wait(&semaphore);
@@ -177,21 +176,21 @@ int get_nickname(struct client * tab_client,int dS, char **pseudo, int nb_client
  * This function searches for the client socket descriptor in the client array and deletes it. It deletes by setting the value of the client socket descriptor to -1.
  * 
  * @param dS The client socket descriptor to delete.
- * @param tab_of_client The array of client socket descriptors.
+ * @param tab_client The array of client socket descriptors.
  * @return Returns 0 if the client was successfully deleted, -1 otherwise.
  */
-int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
+int delete_client (int dS, struct client *tab_client,sem_t semaphore) {
     int res = -1;
     int i = 0;
     int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
     if (waitCheck == -1) {
-        perror("semaphore_wait error : semop failed\n");
+        perror("sem_wait error : semop failed\n");
         return -1;
     }
 
-    while (res == -1) {
-        if (tab_of_client[i].socket == dS) {
-            tab_of_client[i].socket = -1;
+    while (res == -1 && i<10) {
+        if (tab_client[i].socket == dS) {
+            tab_client[i].socket = -1;
             res = 0;
         }
         i = i+1;
@@ -202,9 +201,99 @@ int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
         perror("sem_post error : semop failed\n");
         return -1;
     }
-
-    close(dS);
+    send_message(dS,"Vous avez été kick");
+    int code = close(dS);
+    if (code == 0) {
+        puts("Fermeture de la socket réussite");
+    }
+    else if (code == -1) {
+        perror("Error closing socket");
+    }
     return res;
+}
+
+int get_dS(char * username,struct client* tab_client, sem_t semaphore) {
+    int res = -1;
+    int i = 0;
+    sem_wait(&semaphore);
+    while (i<10 && res == -1) {
+        if (tab_client[i].socket != -1) {
+            printf("Il y a l'utilisateur : %s qui a le dS : %d \n",tab_client[i].nickname,tab_client[i].socket);
+        } 
+        if ( strcmp(username,tab_client[i].nickname) == 0) {
+            res = tab_client[i].socket;
+        }
+        i++;
+    }
+    sem_post(&semaphore);
+    return res;
+}
+
+
+void whisper(char * username, char * message, struct client *tab_client, sem_t semaphore) {
+    printf("Passage dans whisper \n");
+    int req;
+    int dS_cible = get_dS(username,tab_client,semaphore);
+    printf("Le dS cible vaut : %d \n",dS_cible);
+    if (dS_cible == -1) {
+        perror("Utilisateur introuvable");
+    }
+    else {
+        int res = send_message(dS_cible, message);
+        if (res < 0) {
+            perror("Error sending the message");
+        }
+    }
+}
+
+int kick(char * username, struct client *tab_client, sem_t semaphore) {
+    int dS_cible = get_dS(username,tab_client,semaphore);
+    delete_client(dS_cible, tab_client, semaphore);
+    }
+
+
+int man(int descripteur) {
+    puts("Passage dans la fonction man");
+    FILE* fichier = NULL;
+    char chaine[100] = "";
+    fichier = fopen("commande.txt", "r");
+    if (fichier != NULL) {
+        while (fgets(chaine, 100, fichier) != NULL) {
+            char *message = chaine;
+            send_message(descripteur, message);
+        }
+        fclose(fichier);
+    }
+    return 0;
+}
+
+/*
+This function is in charge of detection of commands in a message
+List of case value of return : 
+    - 1 if nothing to do (/kick)
+    - 2 if there is no command
+    - -1 if there is a problem 
+    - 0 if the user needs to be disconnected
+*/
+int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descripteur) {
+    if (arg[0] == '/') {
+        char *tok = strtok(arg+1, " ");
+        if (strcmp(tok, "kick") == 0) {
+            tok = strtok(NULL, " ");
+            kick(tok, tab_client, semaphore);
+            return 1; // Nothing to do
+        }else if (strcmp(tok, "whisper") == 0) {
+            tok = strtok(NULL, " " );
+            char * message = strtok(NULL, "\0");
+            whisper(tok, message, tab_client, semaphore);
+            return 1;
+        }else if (strcmp(tok, "close") == 0) {
+            return 0; //  0 = need to deconnect
+        }else if (strcmp(tok, "man") == 0) {
+            man(descripteur);
+            return 1;
+        }
+    }else {return 2;}
 }
 
 /**
@@ -224,22 +313,34 @@ void * discussion (void * arg) {
 
     while (conversation) {
         int res =  recv_message(dS, &message);
-        if (res < 0) {
-            perror("Error receiving the message");
-        }
-        else if (res == 0 || strcmp(message,"fin") == 0) {
+        if (res <= 0) {
+            if (res == 0) {
+                perror("Error receiving the message");
+                int resultat = delete_client(dS, argument->tab_client, argument->semaphore_id);
+                if (resultat == 0) {
+                puts("Suppression réussi");}
+            }
+            
             puts("Deconnexion d'un client");
-            int resultat = delete_client(dS, argument->tab_of_client, argument->semaphore_id);
+
             conversation = 0;
         }
         else {
             printf("Message recu : %s \n",message);
-            char * pseudo = (char*) malloc(sizeof(char));
-            int code = get_nickname(argument->tab_of_client,dS,&pseudo,argument->Nb_client_max,argument->semaphore_id);
-            strcat(pseudo,message);
-            res = send_all(dS, pseudo, argument->tab_of_client, argument->semaphore_id, argument->Nb_client_max); 
+            char * pseudo = (char*) malloc(sizeof(char));// Variabe to store nickname
+            int code = get_nickname(argument->tab_client,dS,&pseudo,argument->Nb_client_max,argument->semaphore_id); //Here we get the nickname of the sender to add it to the message
+            int rep = analyse(message, argument->tab_client, argument->semaphore_id, dS);
+            if (rep == 2) { //Case no command
+                strcat(pseudo,message);
+                res = send_all(dS,pseudo, argument->tab_client, argument->semaphore_id, argument->Nb_client_max); 
+            }else if (rep == 0) { //Case command /quit 
+                pthread_exit(0);
+            }else if (rep == -1){
+                perror("Error");
+            }
         }
     }
+    puts("Sortie du thread");
     pthread_exit(0);
 }
 
@@ -256,12 +357,7 @@ void * discussion (void * arg) {
 int add_client(struct client *tab_client, int size, int dS, sem_t semaphore) {
     int res = -1;
     int i = 0;
-    int waitCheck = sem_wait(&semaphore);
-    if (waitCheck == -1) {
-        perror("semaphore_wait error");
-        return res;
-    }
-
+    sem_wait(&semaphore);
     while (res == -1 && i < size) {
         if (tab_client[i].socket == -1) {
             tab_client[i].socket = dS;
@@ -288,7 +384,7 @@ int set_nickname(struct client *tab_client, int Nb_client_max, int dS, sem_t sem
 
     int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
     if (waitCheck == -1) {
-        perror("semaphore_wait error");
+        perror("sem_wait error");
         return compt;
     }
 
@@ -370,12 +466,11 @@ void * get_client (void * arg) {
                 close(dSClient);
             }
             pthread_t tid;
-            struct thread_argument argument = {dSClient,args->semaphore_id ,args->tab_client, args->Nb_client_max};
+            struct thread_argument argument = {dSClient,args->tab_client,args->semaphore_id, args->Nb_client_max};
             int i = pthread_create (&tid, NULL, discussion, &argument);
         }
     }
 } 
-
 
 /**
  * @brief The main function of the server program.
@@ -465,4 +560,5 @@ int main(int argc, char *argv[]) {
     close(dS);
 
     return 0;
+
 }
