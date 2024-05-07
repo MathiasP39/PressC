@@ -179,7 +179,7 @@ int get_nickname(struct client * tab_client,int dS, char **pseudo, int nb_client
  * @param tab_client The array of client socket descriptors.
  * @return Returns 0 if the client was successfully deleted, -1 otherwise.
  */
-int delete_client (int dS, struct client* tab_of_client,sem_t semaphore) {
+int delete_client (int dS, struct client* tab_client,sem_t semaphore) {
     int res = -1;
     int i = 0;
     int waitCheck = sem_wait(&semaphore); //wait for the semaphore to be available
@@ -471,7 +471,7 @@ void * get_client (void * arg) {
                 close(dSClient);
             }
             pthread_t tid;
-            struct thread_argument argument = {dSClient,args->semaphore_id ,args->tab_client, args->Nb_client_max};
+            struct thread_argument argument = {dSClient,args->tab_client, args->semaphore_id ,args->Nb_client_max,};
             int i = pthread_create (&tid, NULL, discussion, &argument);
         }
     }
