@@ -121,6 +121,8 @@ int main(int argc, char *argv[]) {
     pthread_t tid;
     pthread_t tid2;
 
+    printf("Pseudo : ");
+
     int i = pthread_create (&tid, NULL, message_reception,&dS);
     int j = pthread_create(&tid2,NULL,message_sending,&dS);
 
