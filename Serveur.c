@@ -174,7 +174,13 @@ int send_all(int socket_sender, char *message) {
 int get_nickname(int dS, char **pseudo) {
     int i = 0;
     int res = -1;
-    sem_wait(&semaphore_tableau);
+    int *val = (int*)malloc(sizeof(int));
+    sem_getvalue(&semaphore_tableau,val);
+    puts("Semaphore nickname");
+    int error = sem_wait(&semaphore_tableau);
+    if (error < 0) {
+        perror("Error while trying to access semaphore");
+    }
     while (i<NB_CLIENT_MAX && res == -1) {
         if (tab_client[i].socket == dS) {
             strcpy(*pseudo, tab_client[i].nickname);
@@ -199,6 +205,7 @@ int get_nickname(int dS, char **pseudo) {
 int delete_client (int dS) {
     int res = -1;
     int i = 0;
+    puts("Semaphore delete client");
     int waitCheck = sem_wait(&semaphore_tableau); //wait for the semaphore to be available
     if (waitCheck == -1) {
         perror("sem_wait error : semop failed\n");
@@ -206,6 +213,7 @@ int delete_client (int dS) {
     }
     while (res == -1 && i< NB_CLIENT_MAX) {
         if (tab_client[i].socket == dS) {
+            printf("le nom du supprimé est : %s et sa socket vaut %d\n",tab_client[i].nickname,tab_client[i].socket);
             tab_client[i].socket = -1;
             tab_client[i].nickname = "";
             res = 0;
@@ -218,14 +226,7 @@ int delete_client (int dS) {
         perror("sem_post error : semop failed\n");
         return -1;
     }
-    send_message(dS,"Vous avez été déconnecté\n");
-    int code = close(dS);
-    if (code == 0) {
-        puts("Fermeture de la socket réussite");
-    }
-    else if (code == -1) {
-        perror("Error closing socket");
-    }
+    puts("Relache semaphore delete client");
     return res;
 }
 
@@ -241,6 +242,7 @@ int delete_client (int dS) {
 int get_dS(char * username) {
     int res = -1;
     int i = 0;
+    puts("Semaphore getDs");
     sem_wait(&semaphore_tableau);
     while (i<NB_CLIENT_MAX && res == -1) {
         if (tab_client[i].socket != -1) {
@@ -264,7 +266,7 @@ int get_dS(char * username) {
  * @param semaphore The semaphore used for synchronization.
  * @return Returns 1 on success, -1 on failure.
  */
-int whisper(char * username, char * message) {
+int whisper(int sender_dS,char * username, char * message) {
     int req;
     int dS_cible = get_dS(username);
     if (dS_cible == -1) {
@@ -273,7 +275,7 @@ int whisper(char * username, char * message) {
     }
 
     char * sender = (char*) malloc(sizeof(char));
-    int code = get_nickname(dS_cible, &sender);
+    int code = get_nickname(sender_dS, &sender);
     if (code == -1) {
         printf("Error getting the nickname\n");
         return -1;
@@ -317,6 +319,7 @@ int kick(char * username) {
     if (deleteCheck != 0) {
         printf("Error kicking the client\n");
     }
+    close(dS_cible);
     return deleteCheck;
 }
 /**
@@ -348,6 +351,7 @@ int man(int descripteur) {
  * @return 1 if the shutdown is successful, -1 otherwise.
  */
 int shutdownserv(int dS) {
+    puts("Semaphore shutdown");
     sem_wait(&semaphore_tableau);
     for (int i = 0; i<NB_CLIENT_MAX; i++) {
         if (tab_client[i].socket != -1) {
@@ -373,6 +377,7 @@ int shutdownserv(int dS) {
  */
 
 int list(int descripteur) {
+    puts("Semaphore List");
     sem_wait(&semaphore_tableau);
     for (int i = 0; i<NB_CLIENT_MAX; i++) {
         if (tab_client[i].socket != -1) {
@@ -399,10 +404,12 @@ int list(int descripteur) {
 int quit (int descripteur) {
     int res = delete_client(descripteur);
     if (res == 0) {
+        close(descripteur);
         puts("Suppression réussie");
         return 1;
     }
     else {
+        puts("Dans quit : suppression raté");
         return -1;
     }
 }
@@ -415,8 +422,11 @@ List of case value of return :
     - -1 if there is a problem 
     - 0 if the user needs to be disconnected
 */
-int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descripteur) {
+int analyse(char * arg, int descripteur) {
+    puts("passage dans analyse");
+    puts("Reperage du /");
     if (arg[0] == '/') {
+        puts("Reperage du /");
         char *tok = strtok(arg+1, " ");
         if (strcmp(tok, "kick") == 0) {
             tok = strtok(NULL, " ");
@@ -425,7 +435,7 @@ int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descript
         }else if (strcmp(tok, "whisper") == 0) {
             tok = strtok(NULL, " " );
             char * message = strtok(NULL, "\0");
-            whisper(tok, message);
+            whisper(descripteur,tok, message);
             return 1;
         }else if (strcmp(tok, "close") == 0) {
             return 0; //  0 = need to deconnect
@@ -436,10 +446,12 @@ int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descript
             list(descripteur);
             return 1;
         }else if (strcmp(tok, "quit") == 0) {
+            puts("passage dans quit");
             return quit(descripteur);
         }else if (strcmp(tok, "shutdown") == 0) {
             shutdownserv(descripteur);
         }
+        puts("aucune commande correspondante");
     }else {return 2;}
 }
 
@@ -447,6 +459,7 @@ int analyse(char * arg, struct client *tab_client, sem_t semaphore, int descript
 int set_thread_id (int dS, pthread_t thread_id) {
     int res = -1;
     int i = 0 ;
+    puts("Semaphore set thread id");
     int code = sem_wait(&semaphore_tableau);
 
     while (res == -1 && i<NB_CLIENT_MAX) {
@@ -502,9 +515,12 @@ void * discussion (void * arg) {
         }
         else {
             printf("Message recu : %s \n",message);
+            puts("avant allocation mémoire");
             char * pseudo = (char*) malloc(sizeof(char));// Variabe to store nickname
+            puts("avant getnickname");
             int code = get_nickname(dS,&pseudo); //Here we get the nickname of the sender to add it to the message
-            int rep = analyse(message, tab_client, semaphore_tableau, dS);
+            puts("apres get nickname");
+            int rep = analyse(message, dS);
             if (rep == 2) { //Case no command
                 strcat(pseudo,message);
                 res = send_all(dS,pseudo);
@@ -513,12 +529,12 @@ void * discussion (void * arg) {
                 shutdownserv(dS);
             }else if (rep == -1){
                 puts("Error in the command");
-                perror("Error");
             }
         }
     }
     free(message);
     pthread_kill(pthread_self(), SIGUSR1);
+    puts("envoie du signal réussi");
     pthread_exit(0);
 }
 
@@ -535,6 +551,7 @@ void * discussion (void * arg) {
 int add_client(struct client *tab_client, int size, int dS, sem_t semaphore) {
     int res = -1;
     int i = 0;
+    puts("Semaphore add client");
     sem_wait(&semaphore_tableau);
     while (res == -1 && i < size) {
         if (tab_client[i].socket == -1) {
@@ -551,22 +568,28 @@ void clean_client () {
     puts("passage dans clean client");
     int res = -1;
     int i = 0;
+    puts("Semaphore clean client");
     int waitCheck = sem_wait(&semaphore_tableau); //wait for the semaphore to be available
     if (waitCheck == -1) {
         perror("sem_wait error : semop failed\n");
     }
     else {
         while ( i< NB_CLIENT_MAX && res == -1) {
-        if (tab_client[i].thread_identifier!= -1 && (pthread_join(tab_client[i].thread_identifier,NULL) == 0)) {
-            tab_client[i].socket = -1;
-            tab_client[i].nickname = "";
-            tab_client[i].thread_identifier = -1;
-            res = 0;
+            puts("passage dans la boucle");
+            if (tab_client[i].thread_identifier != -1) {
+                if (pthread_join(tab_client[i].thread_identifier,NULL) == 0) {
+                    puts("suppression d'un utilisateur");
+                    tab_client[i].socket = -1;
+                    tab_client[i].nickname = "";
+                    tab_client[i].thread_identifier = -1;
+                    res = 0;
+                }
+            }
+            i = i+1;
         }
-        i = i+1;
-    }
     }
     int waitFree = sem_post(&semaphore_tableau);
+    puts("fin clean client");
 }
 
 /**
@@ -581,7 +604,7 @@ int set_nickname(int dS) {
     int compt = -1;
     int i = 0;
     char *message = NULL;
-
+    puts("Semaphore set nickname");
     int waitCheck = sem_wait(&semaphore_tableau); //wait for the semaphore to be available
     if (waitCheck == -1) {
         perror("sem_wait error");
@@ -675,7 +698,7 @@ void * get_client (void * arg) {
 
 int clean_all_threads () {
     int res = 0;
-
+    puts("Semaphore clean all");
     int code = sem_wait(&semaphore_tableau);
 
     int i = 0;
@@ -710,7 +733,7 @@ void extinction () {
  */
 int main(int argc, char *argv[]) {
 
-    signal(SIGINT ,extinction);
+    //signal(SIGINT ,extinction);
 
     signal(SIGUSR1, clean_client);
 
