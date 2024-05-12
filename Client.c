@@ -100,7 +100,15 @@ int socket_connection (char * ip, char* port,int socket_id) {
     return 0;
 }
 
+void extinction() {
+    puts("You will be disconnected ...");
+    sleep(1);
+    exit(0);
+}
+
 int main(int argc, char *argv[]) {
+
+    signal(SIGINT ,extinction);
 
     //Check of number of argument
     if (argc =! 3) {
