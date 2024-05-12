@@ -6,6 +6,10 @@
 #include <unistd.h>
 #include <pthread.h>
 #include "utilitaire.h"
+#include <signal.h>
+
+
+int static dS;
 
 /*
 This program generates client for communication
@@ -100,7 +104,16 @@ int socket_connection (char * ip, char* port,int socket_id) {
     return 0;
 }
 
+void extinction() {
+    puts("You will be disconnected ...");
+    close(dS);
+    sleep(1);
+    exit(0);
+}
+
 int main(int argc, char *argv[]) {
+
+    //signal(SIGINT ,extinction);
 
     //Check of number of argument
     if (argc =! 3) {
@@ -109,7 +122,7 @@ int main(int argc, char *argv[]) {
     }
 
     //Socket creation
-    int dS = socket(PF_INET, SOCK_STREAM, 0);
+    dS = socket(PF_INET, SOCK_STREAM, 0);
     if (dS == -1){
         perror("Socket creation failed");
         exit(0);
@@ -127,12 +140,6 @@ int main(int argc, char *argv[]) {
     int j = pthread_create(&tid2,NULL,message_sending,&dS);
 
     if (pthread_join(tid,NULL) == 0 || pthread_join(tid2,NULL) == 0) {
-        int checkSD = close(dS);
-        if (checkSD == -1){
-            perror("shutdownserv failed");
-        } 
-        else {
-            exit(0);
-        }
+        extinction();
     }
 }
