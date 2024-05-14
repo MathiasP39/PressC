@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include "utilitaire.h"
 #include <signal.h>
+#include <dirent.h>
 
 
 int static dS;
@@ -133,6 +134,9 @@ int main(int argc, char *argv[]) {
 
     pthread_t tid;
     pthread_t tid2;
+
+    pthread_t tidfilesnd; //Thread for file sending
+    pthread_t tidfilercv; //Thread for file receiving
 
     printf("Pseudo : ");
 

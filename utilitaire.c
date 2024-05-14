@@ -2,8 +2,10 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+#include <dirent.h>
 
-//----A DEBUGGER----
+
+
 
 /**
  * Sends a message over a given descriptor.
@@ -69,5 +71,34 @@ int recv_message(int descripteur, char** message) {
         return res; //Return of error code
     }
     return 1; //All went good
+}
+
+
+//FILE MANAGEMENT
+
+
+/**
+ * Updates the file list in the specified directory.
+ * 
+ * @param directory The directory path.
+ */
+void update_file_list(const char* directory) {
+    DIR* dir;
+    struct dirent* entry;
+
+    dir = opendir(directory);
+    if (dir == NULL) {
+        perror("Unable to open directory");
+        return;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        // Ignore the "." and ".." entries
+        if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+            printf("%s\n", entry->d_name);
+        }
+    }
+
+    closedir(dir);
 }
 
