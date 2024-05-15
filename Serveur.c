@@ -12,9 +12,9 @@
 #include <signal.h>
 #define NB_CLIENT_MAX 10
 
-sem_t static semaphore_tableau;
-
 sem_t static semaphore_nb_client;
+
+pthread_mutex_t mutex_tab_cli;
 
 struct client static *tab_client;
 
@@ -148,7 +148,7 @@ int connect_to_client(struct sockaddr_in adress, int descripteur) {
  * @param tab_client The array of client socket descriptors.
  */
 int send_all(int socket_sender, char *message) {
-    sem_wait(&semaphore_tableau);
+    pthread_mutex_lock(&mutex_tab_cli);
     for (int i = 0; i<NB_CLIENT_MAX; i++) {
         if (tab_client[i].socket != -1 && tab_client[i].socket != socket_sender) {
             int res = send_message(tab_client[i].socket, message);
@@ -157,7 +157,7 @@ int send_all(int socket_sender, char *message) {
             }
         }
     }
-    sem_post(&semaphore_tableau);
+    pthread_mutex_unlock(&mutex_tab_cli);
     return 0;
 }
 
@@ -174,9 +174,7 @@ int send_all(int socket_sender, char *message) {
 int get_nickname(int dS, char **pseudo) {
     int i = 0;
     int res = -1;
-    int *val = (int*)malloc(sizeof(int));
-    sem_getvalue(&semaphore_tableau,val);
-    int error = sem_wait(&semaphore_tableau);
+    int error = pthread_mutex_lock(&mutex_tab_cli);
     if (error < 0) {
         perror("Error while trying to access semaphore");
     }
@@ -188,7 +186,7 @@ int get_nickname(int dS, char **pseudo) {
         }
         i++;
     }
-    sem_post(&semaphore_tableau);
+    pthread_mutex_unlock(&mutex_tab_cli);
     return res;
 }
 
@@ -204,7 +202,7 @@ int get_nickname(int dS, char **pseudo) {
 int delete_client (int dS) {
     int res = -1;
     int i = 0;
-    int waitCheck = sem_wait(&semaphore_tableau); //wait for the semaphore to be available
+    int waitCheck = pthread_mutex_lock(&mutex_tab_cli);
     if (waitCheck == -1) {
         perror("sem_wait error : semop failed\n");
         return -1;
@@ -219,7 +217,7 @@ int delete_client (int dS) {
         i = i+1;
     }
 
-    int unlockCheck = sem_post(&semaphore_tableau); //unlock the semaphore previously locked
+    int unlockCheck = pthread_mutex_unlock(&mutex_tab_cli);
     if (unlockCheck == -1) {
         perror("sem_post error : semop failed\n");
         return -1;
@@ -239,7 +237,7 @@ int delete_client (int dS) {
 int get_dS(char * username) {
     int res = -1;
     int i = 0;
-    sem_wait(&semaphore_tableau);
+    pthread_mutex_lock(&mutex_tab_cli);
     while (i<NB_CLIENT_MAX && res == -1) {
         if (tab_client[i].socket != -1) {
             printf("Il y a l'utilisateur : %s qui a le dS : %d \n",tab_client[i].nickname,tab_client[i].socket);
@@ -249,7 +247,7 @@ int get_dS(char * username) {
         }
         i++;
     }
-    sem_post(&semaphore_tableau);
+    pthread_mutex_unlock(&mutex_tab_cli);
     return res;
 }
 
@@ -346,20 +344,13 @@ int man(int descripteur) {
  * @param semaphore The semaphore used for synchronization.
  * @return 1 if the shutdown is successful, -1 otherwise.
  */
-int shutdownserv(int dS) {
-    sem_wait(&semaphore_tableau);
-    for (int i = 0; i<NB_CLIENT_MAX; i++) {
-        if (tab_client[i].socket != -1) {
-            int res = send_message(tab_client[i].socket, "Le serveur va s'arrêter\n");
-            if (res < 0) {
-                puts("Error sending the message");
-                return -1;
-            }
-        }
-    }
-    sem_post(&semaphore_tableau);
-    close(dS);
-    return 1;
+void shutdownserv() {
+    puts("\nLe serveur va s'éteindre ...");
+    send_all(-1, "Le serveur va s'arreter, vous allez etre deconnecter \n");
+    server_running = 0;
+    shutdown(Serveur_dS,SHUT_RDWR );
+    sleep(1);
+    exit(0);
 }
 
 /**
@@ -372,7 +363,7 @@ int shutdownserv(int dS) {
  */
 
 int list(int descripteur) {
-    sem_wait(&semaphore_tableau);
+    pthread_mutex_lock(&mutex_tab_cli);
     for (int i = 0; i<NB_CLIENT_MAX; i++) {
         if (tab_client[i].socket != -1) {
             char * message = tab_client[i].nickname;
@@ -383,7 +374,7 @@ int list(int descripteur) {
             }
         }
     }
-    sem_post(&semaphore_tableau);
+    pthread_mutex_unlock(&mutex_tab_cli);
     return 1;
 }
 
@@ -440,7 +431,7 @@ int analyse(char * arg, int descripteur) {
             puts("passage dans quit");
             return quit(descripteur);
         }else if (strcmp(tok, "shutdown") == 0) {
-            shutdownserv(descripteur);
+            shutdownserv();
         }
     }else {return 2;}
 }
@@ -449,8 +440,7 @@ int analyse(char * arg, int descripteur) {
 int set_thread_id (int dS, pthread_t thread_id) {
     int res = -1;
     int i = 0 ;
-    int code = sem_wait(&semaphore_tableau);
-
+    pthread_mutex_lock(&mutex_tab_cli);
     while (res == -1 && i<NB_CLIENT_MAX) {
         if (tab_client[i].socket == dS) {
             tab_client[i].thread_identifier = thread_id;
@@ -458,8 +448,7 @@ int set_thread_id (int dS, pthread_t thread_id) {
         }
         i++;
     }
-
-    code = sem_post(&semaphore_tableau);
+    pthread_mutex_unlock(&mutex_tab_cli);
     return res;
 }
 
@@ -512,7 +501,7 @@ void * discussion (void * arg) {
                 res = send_all(dS,pseudo);
                 free(pseudo);
             }else if (rep == 0) { //Case command /quit 
-                shutdownserv(dS);
+                puts("do something");
             }else if (rep == -1){
                 puts("Error in the command");
             }
@@ -533,25 +522,25 @@ void * discussion (void * arg) {
  * @param dS The client socket descriptor to be added.
  * @return Returns 0 if the client was successfully added, -1 otherwise.
  */
-int add_client(struct client *tab_client, int size, int dS, sem_t semaphore) {
+int add_client(int dS) {
     int res = -1;
     int i = 0;
-    sem_wait(&semaphore_tableau);
-    while (res == -1 && i < size) {
+    pthread_mutex_lock(&mutex_tab_cli);
+    while (res == -1 && i < NB_CLIENT_MAX) {
         if (tab_client[i].socket == -1) {
             tab_client[i].socket = dS;
             res = 0;
         }
         ++i;
     }
-    sem_post(&semaphore_tableau);
+    pthread_mutex_unlock(&mutex_tab_cli);
     return res;
 }
 
 void clean_client () {
     int res = -1;
     int i = 0;
-    int waitCheck = sem_wait(&semaphore_tableau); //wait for the semaphore to be available
+    int waitCheck = pthread_mutex_lock(&mutex_tab_cli);
     if (waitCheck == -1) {
         perror("sem_wait error : semop failed\n");
     }
@@ -568,7 +557,7 @@ void clean_client () {
             i = i+1;
         }
     }
-    int waitFree = sem_post(&semaphore_tableau);
+    pthread_mutex_unlock(&mutex_tab_cli);
 }
 
 /**
@@ -583,7 +572,7 @@ int set_nickname(int dS) {
     int compt = -1;
     int i = 0;
     char *message = NULL;
-    int waitCheck = sem_wait(&semaphore_tableau); //wait for the semaphore to be available
+    int waitCheck = pthread_mutex_lock(&mutex_tab_cli);
     if (waitCheck == -1) {
         perror("sem_wait error");
         return compt;
@@ -628,11 +617,7 @@ int set_nickname(int dS) {
         return -1;
     }
 
-    int unlockCheck = sem_post(&semaphore_tableau); //unlock
-    if (unlockCheck == -1) {
-        perror("semaphore_unlock error");
-        return -1;
-    }
+    pthread_mutex_unlock(&mutex_tab_cli);
 
     return compt;
 }
@@ -659,13 +644,14 @@ void * get_client (void * arg) {
             close(dSClient);
         }
         else if (res == 0) {
-            res = add_client(tab_client, NB_CLIENT_MAX, dSClient, semaphore_tableau);
-            puts("Client ajouté");
+            res = add_client(dSClient);
             res = set_nickname(dSClient);
+             puts("On est la3");
             if (res == -1) {
                 perror("set : Error getting the nickname");
                 close(dSClient);
             }
+            puts("Client ajouté");  
             pthread_t tid;
             struct thread_argument argument = {dSClient, tid};
             int i = pthread_create (&tid, NULL, discussion, &argument);
@@ -675,11 +661,7 @@ void * get_client (void * arg) {
 
 int clean_all_threads () {
     int res = 0;
-    int *val = (int*)malloc(sizeof(int));
-    sem_getvalue(&semaphore_tableau,val);
-    printf("Le sémaphore vaut : %d \n",*val);
-    int code = sem_wait(&semaphore_tableau);
-
+    pthread_mutex_lock(&mutex_tab_cli);
     int i = 0;
 
     while (i < NB_CLIENT_MAX) {
@@ -689,19 +671,10 @@ int clean_all_threads () {
         }
         i++;
     }
-
-    code = sem_post(&semaphore_tableau);
+    pthread_mutex_lock(&mutex_tab_cli);
     return res;
 }
 
-void extinction () {
-    puts("\nLe serveur va s'éteindre ...");
-    server_running = 0;
-    clean_all_threads();
-    shutdown(Serveur_dS,SHUT_RDWR );
-    sleep(1);
-    exit(0);
-}
 
 /**
  * @brief The main function of the server program.
@@ -712,7 +685,7 @@ void extinction () {
  */
 int main(int argc, char *argv[]) {
 
-    signal(SIGINT ,extinction);
+    signal(SIGINT , shutdownserv);
 
     //signal(SIGUSR1, clean_client);
 
@@ -743,16 +716,16 @@ int main(int argc, char *argv[]) {
     int res = sem_init(&semaphore_nb_client,0,NB_CLIENT_MAX);
 
 
-    res = sem_init(&semaphore_tableau,0,1);
+    res = pthread_mutex_init(&mutex_tab_cli,NULL);
 
     //Initialisation of all value of the tab
-    res = sem_wait(&semaphore_tableau);
+    pthread_mutex_lock(&mutex_tab_cli);
     for (int i = 0; i<NB_CLIENT_MAX; ++i) {
         tab_client[i].nickname = "";
         tab_client[i].socket = -1;
         tab_client[i].thread_identifier = -1;
     }
-    res = sem_post(&semaphore_tableau);
+    pthread_mutex_unlock(&mutex_tab_cli);
     //Gestion erreur
 
     int ecoute = listen(Serveur_dS,1);
@@ -782,7 +755,7 @@ int main(int argc, char *argv[]) {
 
     printf("Fin du programme");
 
-    extinction();
+    shutdownserv();
 
     return 0;
 
