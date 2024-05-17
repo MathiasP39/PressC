@@ -3,6 +3,8 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <dirent.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 
@@ -81,24 +83,30 @@ int recv_message(int descripteur, char** message) {
  * Updates the file list in the specified directory.
  * 
  * @param directory The directory path.
+ * @return A string of filenames separated by newlines, or NULL if an error occurs.
  */
-void update_file_list(const char* directory) {
+char* update_file_list(const char* directory) {
     DIR* dir;
     struct dirent* entry;
+    char* file_list = malloc(1);  // Start with an empty string
+    *file_list = '\0';
 
-    dir = opendir(directory);
+    dir = opendir(directory); // Open the directory
     if (dir == NULL) {
         perror("Unable to open directory");
-        return;
+        return NULL;
     }
 
     while ((entry = readdir(dir)) != NULL) {
         // Ignore the "." and ".." entries
         if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
-            printf("%s\n", entry->d_name);
+            file_list = realloc(file_list, strlen(file_list) + strlen(entry->d_name) + 2);  // +2 for the newline and null terminator
+            strcat(file_list, entry->d_name); // Add the filename to the list
+            strcat(file_list, "\n");
         }
     }
 
     closedir(dir);
+    return file_list;
 }
 

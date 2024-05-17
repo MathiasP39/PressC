@@ -307,7 +307,7 @@ int whisper(int sender_dS,char * username, char * message) {
  * @param username The username of the client to be kicked.
  * @param tab_client The array of client structures.
  * @param semaphore The semaphore used for synchronization.
- * @return 0 on success, -1 on failure.
+ * @return 1 on success, -1 on failure.
  */
 int kick(char * username) {
     int dS_cible = get_dS(username);
@@ -320,13 +320,13 @@ int kick(char * username) {
         printf("Error kicking the client\n");
     }
     close(dS_cible);
-    return deleteCheck;
+    return 1;
 }
 /**
  * Function to display the contents of a file to a client.
  * 
  * @param descripteur The descriptor of the client.
- * @return 0 on success, -1 on failure.
+ * @return 1 on success, -1 on failure.
  */
 int man(int descripteur) {
     FILE* fichier = NULL;
@@ -339,7 +339,7 @@ int man(int descripteur) {
         }
         fclose(fichier);
     }
-    return 0;
+    return 1;
 }
 
 /**
@@ -375,7 +375,6 @@ int shutdownserv(int dS) {
  * @param descripteur The client socket descriptor.
  * @return 1 if the list is successfully sent, -1 otherwise.
  */
-
 int list(int descripteur) {
     puts("Semaphore List");
     sem_wait(&semaphore_tableau);
@@ -414,6 +413,31 @@ int quit (int descripteur) {
     }
 }
 
+/**
+ * Lists the files in the server's 'biblio' library and send the list to the client.
+ * Uses update_file_list(const char* directory) function from utilitaire.c, which returns a string containing the list of files.
+ * 
+ * @param descripteur The client socket descriptor.
+ * @return 1 if the list is successfully sent, -1 otherwise.
+ */
+int filelist(int descripteur) {
+    char* file_list = update_file_list("./biblio");
+    if (file_list == NULL) {
+        perror("Unable to get file list");
+        return -1;
+    }
+
+    ssize_t bytes_sent = send(descripteur, file_list, strlen(file_list), 0);
+    free(file_list);  // Don't forget to free the memory!
+
+    if (bytes_sent == -1) {
+        perror("Failed to send file list");
+        return -1;
+    }
+
+    return 1;
+}
+
 /*
 This function is in charge of detection of commands in a message
 List of case value of return : 
@@ -423,35 +447,33 @@ List of case value of return :
     - 0 if the user needs to be disconnected
 */
 int analyse(char * arg, int descripteur) {
-    puts("passage dans analyse");
+    puts("Passage dans analyse");
     puts("Reperage du /");
     if (arg[0] == '/') {
         puts("Reperage du /");
         char *tok = strtok(arg+1, " ");
         if (strcmp(tok, "kick") == 0) {
             tok = strtok(NULL, " ");
-            kick(tok);
-            return 1; // Nothing to do
+            return kick(tok);
         }else if (strcmp(tok, "whisper") == 0) {
             tok = strtok(NULL, " " );
             char * message = strtok(NULL, "\0");
-            whisper(descripteur,tok, message);
-            return 1;
+            return whisper(descripteur,tok, message);
         }else if (strcmp(tok, "close") == 0) {
             return 0; //  0 = need to deconnect
         }else if (strcmp(tok, "man") == 0) {
-            man(descripteur);
-            return 1;
+            return man(descripteur);
         }else if (strcmp(tok, "list") == 0) {
-            list(descripteur);
-            return 1;
+            return list(descripteur);
         }else if (strcmp(tok, "quit") == 0) {
-            puts("passage dans quit");
+            puts("Passage dans quit");
             return quit(descripteur);
         }else if (strcmp(tok, "shutdown") == 0) {
-            shutdownserv(descripteur);
+            return shutdownserv(descripteur);
+        }else if (strcmp(tok, "biblio") == 0) {
+            return filelist(descripteur);
         }
-        puts("aucune commande correspondante");
+        puts("Aucune commande correspondante");
     }else {return 2;}
 }
 
