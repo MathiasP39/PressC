@@ -414,6 +414,11 @@ int quit (int descripteur) {
     }
 }
 
+void file(int descripteur) {
+    strcpy(buffer, "Please enter the filename: ");
+    send(descripteur, buffer, sizeof(buffer), 0);
+}
+
 /*
 This function is in charge of detection of commands in a message
 List of case value of return : 
@@ -450,6 +455,8 @@ int analyse(char * arg, int descripteur) {
             return quit(descripteur);
         }else if (strcmp(tok, "shutdown") == 0) {
             shutdownserv(descripteur);
+        }else if (strcmp(tok, "file") == 0) {
+            file();
         }
         puts("aucune commande correspondante");
     }else {return 2;}
