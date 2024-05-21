@@ -145,7 +145,4 @@ int main(int argc, char *argv[]) {
 }
 
 void send_file() {
-    FILE* file;
-    char *file_data = (char*) malloc(sizeof(jsp));
-    file = fopen("ls ./files", "r");
 }
