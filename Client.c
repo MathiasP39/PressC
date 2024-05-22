@@ -114,7 +114,7 @@ void extinction() {
 
 int main(int argc, char *argv[]) {
 
-    signal(SIGINT ,extinction);
+    signal(SIGINT, extinction);
 
     //Check of number of argument
     if (argc =! 3) {

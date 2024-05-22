@@ -20,7 +20,9 @@ struct client static *tab_client;
 
 int static server_running = 1;
 
-int static Serveur_dS ;
+int static Serveur_dS;
+
+struct socket_info file_socket;
 
 
 //Command to launch this program : ./Serveur port
@@ -413,6 +415,10 @@ int quit (int descripteur) {
     }
 }
 
+
+// FILE SPECIAL COMMAND HANDLE
+
+
 /**
  * Lists the files in the server's 'biblio' library and send the list to the client.
  * Uses update_file_list(const char* directory) function from utilitaire.c, which returns a string containing the list of files.
@@ -428,10 +434,150 @@ int filelist(int descripteur) {
     }
 
     ssize_t bytes_sent = send(descripteur, file_list, strlen(file_list), 0);
-    free(file_list);  // Don't forget to free the memory!
+    free(file_list);  // Free the memory allocated by update_file_list
 
     if (bytes_sent == -1) {
         perror("Failed to send file list");
+        return -1;
+    }
+
+    return 1;
+}
+
+/**
+ * Checks if a file exists.
+ * 
+ * @param filename The name of the file to check.
+ * @return 1 if the file exists, -1 otherwise.
+ */
+int check_file_exists(const char* filename) {
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "biblio/%s", filename); // Check in the 'biblio' directory
+
+    FILE* file = fopen(filepath, "r");
+    if (file == NULL) {
+        perror("recup_file: error opening the file");
+        return -1;
+    }
+    fclose(file);
+    return 1;
+}
+
+/**
+ * Finds a free port on the server.
+ * 
+ * @return The first free port found, or -1 if no free port is found.
+ */
+int get_free_port(int server_port) {
+    int port = server_port + 1; // Start from the server port + 1
+    while (port < 65535) {
+        int test_socket = socket(PF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in adresse = param_socket_adresse(port);
+        if (bind(test_socket, (struct sockaddr*)&adresse, sizeof(adresse)) == 0) {
+            close(test_socket);
+            return port;
+        }
+        close(test_socket);
+        port++;
+    }
+    return -1; // No free port found
+}
+
+/**
+ * Structure representing a socket and its address.
+ */
+struct socket_info {
+    int socket;
+    struct sockaddr_in adresse;
+};
+
+/**
+ * Creates a socket for file recovery.
+ * 
+ * @param server_port The port number of the server.
+ * @return The socket information structure.
+ */
+struct socket_info create_file_recup_socket(int server_port) {
+    struct socket_info info;
+    info.socket = socket(PF_INET, SOCK_STREAM, 0);
+
+    int port = get_free_port(server_port);
+    if (port == -1) {
+        close(info.socket);
+        info.socket = -1;
+        return info;
+    }
+
+    info.adresse = param_socket_adresse(port);
+    if (make_bind(info.socket, info.adresse) != 0) {
+        close(info.socket);
+        info.socket = -1;
+        return info;
+    }
+
+    if (listen(info.socket, 1) < 0) {
+        close(info.socket);
+        info.socket = -1;
+        return info;
+    }
+
+    return info;
+}
+
+
+/**
+ * Sends a file to a client.
+ * 
+ * @param info The socket information structure.
+ * @param filename The name of the file to send.
+ * @return 1 if the file is successfully sent, -1 otherwise.
+*/
+int file_recup_socket(char* filename) {
+    struct socket_info info = file_socket; // Get the file sending socket information
+
+    if (info.socket == -1) {
+        return -1;
+    }
+
+    int dSClient = connect_to_client(info.adresse, info.socket);
+    if (dSClient == -1) {
+        return -1;
+    }
+
+    if (send_file(dSClient, filename) == -1) {
+        return -1;
+    }
+
+    return 1;
+}
+
+/**
+ * Sends a file to a client using a new thread.
+ * Uses the recup_file function to send the file.
+ * 
+ * @param dS The client socket descriptor.
+ * @param filename The name of the file to send.
+ * @return 1 if the thread is successfully created, -1 otherwise.
+*/
+int file_recup_thread(int dS, char * filename) {
+    pthread_t tid;
+    struct thread_argument argument = {dS, tid};
+    int i = pthread_create(&tid, NULL, file_recup_socket, filename);
+    if (i != 0) {
+        perror("Error creating the thread");
+        return -1;
+    }
+
+    // Wait for the thread to finish
+    void* result;
+    if (pthread_join(tid, &result) != 0) {
+        perror("Error joining the thread");
+        return -1;
+    }
+
+    // Check the result of file_recup_socket
+    if (result == NULL) {
+        perror("Error in file_recup_socket");
         return -1;
     }
 
@@ -472,6 +618,9 @@ int analyse(char * arg, int descripteur) {
             return shutdownserv(descripteur);
         }else if (strcmp(tok, "biblio") == 0) {
             return filelist(descripteur);
+        }else if (strcmp(tok, "recup") == 0) {
+            tok = strtok(NULL, " ");
+            return file_recup_thread(descripteur, tok);
         }
         puts("Aucune commande correspondante");
     }else {return 2;}
@@ -779,6 +928,13 @@ int main(int argc, char *argv[]) {
         close(Serveur_dS);
         return -1;
     }
+
+    //File handle
+    file_socket = create_file_recup_socket(Serveur_dS); // Create a new socket to send files
+    if (file_socket.socket == -1) {
+        return -1; //error displayed by the function
+    }
+    //File handle
 
     tab_client = (struct client*)malloc(NB_CLIENT_MAX * sizeof(struct client));
 

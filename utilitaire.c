@@ -5,6 +5,10 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
+// File management
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 
 
@@ -110,3 +114,35 @@ char* update_file_list(const char* directory) {
     return file_list;
 }
 
+/**
+ * Sends a file over a given descriptor.
+ * 
+ * @param descripteur The descriptor to send the file through.
+ * @param file_name The name of the file to be sent.
+ * @return Returns 1 if the file was sent successfully, -1 otherwise.
+*/
+int send_file(int descripteur, const char* file_name) {
+    struct stat file_stat;
+    int file_fd = open(file_name, O_RDONLY); // Open the file
+
+    if (file_fd == -1) {
+        perror("Failed to open file");
+        return -1;
+    }
+
+    if (fstat(file_fd, &file_stat) == -1) { // Get the file stats (attributes)
+        perror("Failed to get file stats");
+        close(file_fd);
+        return -1;
+    }
+
+    ssize_t bytes_sent = sendfile(descripteur, file_fd, NULL, file_stat.st_size); // Send the file
+    close(file_fd);
+
+    if (bytes_sent == -1) {
+        perror("Failed to send file");
+        return -1;
+    }
+
+    return 1;
+}
