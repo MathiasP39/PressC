@@ -99,7 +99,7 @@ struct sockaddr_in param_socket_adresse(char *port) {
     adresse1.sin_family = AF_INET; // address family
     adresse1.sin_addr.s_addr = INADDR_ANY; // address to accept any incoming messages
     adresse1.sin_port = htons(atoi(port)); // port passed as argument
-    printf("Adresse creation \n");
+    // printf("Adresse creation \n");
     return adresse1;
 }
 
@@ -470,9 +470,12 @@ int check_file_exists(const char* filename) {
  */
 int get_free_port(int server_port) {
     int port = server_port + 1; // Start from the server port + 1
+    char port_str[6]; // Buffer to hold the port number as a string
+
     while (port < 65535) {
         int test_socket = socket(PF_INET, SOCK_STREAM, 0);
-        struct sockaddr_in adresse = param_socket_adresse(port);
+        sprintf(port_str, "%d", port); // Convert the port number to a string
+        struct sockaddr_in adresse = param_socket_adresse(port_str);
         if (bind(test_socket, (struct sockaddr*)&adresse, sizeof(adresse)) == 0) {
             close(test_socket);
             return port;
@@ -489,6 +492,7 @@ int get_free_port(int server_port) {
 struct socket_info {
     int socket;
     struct sockaddr_in adresse;
+    char* port;
 };
 
 /**
@@ -501,12 +505,20 @@ struct socket_info create_file_recup_socket(int server_port) {
     struct socket_info info;
     info.socket = socket(PF_INET, SOCK_STREAM, 0);
 
-    int port = get_free_port(server_port);
-    if (port == -1) {
+    int port_num = get_free_port(server_port);
+    char* port = malloc(6 * sizeof(char)); // Maximum 5 digits for a port number + null terminator
+    if (port == NULL) {
+        perror("Failed to allocate memory for port");
+        return info;
+    }
+
+    sprintf(port, "%d", port_num);
+    if (port == "-1") {
         close(info.socket);
         info.socket = -1;
         return info;
     }
+    info.port = port;
 
     info.adresse = param_socket_adresse(port);
     if (make_bind(info.socket, info.adresse) != 0) {
@@ -532,23 +544,27 @@ struct socket_info create_file_recup_socket(int server_port) {
  * @param filename The name of the file to send.
  * @return 1 if the file is successfully sent, -1 otherwise.
 */
-int file_recup_socket(char* filename) {
+void* file_recup_socket(void* arg) {
+    char* filename = (char*)arg;
     struct socket_info info = file_socket; // Get the file sending socket information
 
     if (info.socket == -1) {
-        return -1;
+        return (void*)-1;
     }
 
     int dSClient = connect_to_client(info.adresse, info.socket);
     if (dSClient == -1) {
-        return -1;
+        return (void*)-1;
     }
 
-    if (send_file(dSClient, filename) == -1) {
-        return -1;
+    char filepath[256];
+    sprintf(filepath, "./biblio/%s", filename);
+
+    if (send_file(dSClient, filepath) == -1) {
+        return (void*)-1;
     }
 
-    return 1;
+    return (void*)1;
 }
 
 /**
@@ -565,6 +581,15 @@ int file_recup_thread(int dS, char * filename) {
     int i = pthread_create(&tid, NULL, file_recup_socket, filename);
     if (i != 0) {
         perror("Error creating the thread");
+        return -1;
+    }
+
+    // Sends a message to the client to indicate that the file is being sent
+    char notification[256];
+    sprintf(notification, "/receiving %s on %s", filename, file_socket.port);
+    int res = send_message(dS, notification);
+    if (res < 0) {
+        perror("Error sending the notification");
         return -1;
     }
 
