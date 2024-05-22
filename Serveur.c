@@ -37,7 +37,6 @@ int static Serveur_dS ;
  */
 struct thread_argument {
     int descripteur;        /**< The file descriptor of the client connection */
-    pthread_t thread_identifier;
 };
 
 
@@ -62,7 +61,6 @@ struct arg_get_client {
 struct client {
     char *nickname; ///< The nickname of the client.
     int socket;
-    pthread_t thread_identifier;
 };
 
 
@@ -435,23 +433,6 @@ int analyse(char * arg, int descripteur) {
         }
     }else {return 2;}
 }
-
-
-int set_thread_id (int dS, pthread_t thread_id) {
-    int res = -1;
-    int i = 0 ;
-    pthread_mutex_lock(&mutex_tab_cli);
-    while (res == -1 && i<NB_CLIENT_MAX) {
-        if (tab_client[i].socket == dS) {
-            tab_client[i].thread_identifier = thread_id;
-            res = 0;
-        }
-        i++;
-    }
-    pthread_mutex_unlock(&mutex_tab_cli);
-    return res;
-}
-
 /**
  * Handles the conversation between two clients.
  * 
@@ -471,7 +452,7 @@ void * discussion (void * arg) {
         perror("Error getting the nickname");
     }
     sender[strcspn(sender, " :")] = '\0'; //Remove the " :" from the nickname
-    int res = set_thread_id(dS,argument->thread_identifier);
+
     if (res == -1) {
         perror("Clients doesn't exist");
     }
@@ -508,7 +489,6 @@ void * discussion (void * arg) {
         }
     }
     free(message);
-    //pthread_kill(pthread_self(), SIGUSR1);
     pthread_exit(0);
 }
 
@@ -547,12 +527,9 @@ void clean_client () {
     else {
         while ( i< NB_CLIENT_MAX && res == -1) {
             if (tab_client[i].thread_identifier != -1) {
-                if (pthread_join(tab_client[i].thread_identifier,NULL) == 0) {
-                    tab_client[i].socket = -1;
-                    tab_client[i].nickname = "";
-                    tab_client[i].thread_identifier = -1;
-                    res = 0;
-                }
+                tab_client[i].socket = -1;
+                tab_client[i].nickname = "";
+                res = 0;
             }
             i = i+1;
         }
@@ -659,22 +636,6 @@ void * get_client (void * arg) {
     }
 } 
 
-int clean_all_threads () {
-    int res = 0;
-    pthread_mutex_lock(&mutex_tab_cli);
-    int i = 0;
-
-    while (i < NB_CLIENT_MAX) {
-        if (tab_client[i].socket != -1) {
-            pthread_join(tab_client[i].thread_identifier,NULL);
-            tab_client[i].thread_identifier = -1;
-        }
-        i++;
-    }
-    pthread_mutex_lock(&mutex_tab_cli);
-    return res;
-}
-
 
 /**
  * @brief The main function of the server program.
@@ -687,76 +648,12 @@ int main(int argc, char *argv[]) {
 
     signal(SIGINT , shutdownserv);
 
-    //signal(SIGUSR1, clean_client);
-
-    if (argc != 2) { //security : check if the number of arguments is correct
-        perror("Incorrect number of arguments");
-        printf("Usage : %s <port>\n", argv[0]);
-        return -1;
-    }
-    printf("Start program\n");
-    //There is the const that define the maximum the number of client handled by the server
-
-    int Serveur_dS = creation_socket();
-    if (Serveur_dS == -1) {
-        return -1;
-    }
-
-    struct sockaddr_in adresse = param_socket_adresse(argv[1]);
-
-    int connect = make_bind(Serveur_dS,adresse);
-    if (connect != 0) {
-        close(Serveur_dS);
-        return -1;
-    }
-
-    tab_client = (struct client*)malloc(NB_CLIENT_MAX * sizeof(struct client));
-
-
-    int res = sem_init(&semaphore_nb_client,0,NB_CLIENT_MAX);
-
-
-    res = pthread_mutex_init(&mutex_tab_cli,NULL);
-
-    //Initialisation of all value of the tab
-    pthread_mutex_lock(&mutex_tab_cli);
-    for (int i = 0; i<NB_CLIENT_MAX; ++i) {
-        tab_client[i].nickname = "";
-        tab_client[i].socket = -1;
-        tab_client[i].thread_identifier = -1;
-    }
-    pthread_mutex_unlock(&mutex_tab_cli);
     //Gestion erreur
-
-    int ecoute = listen(Serveur_dS,1);
-    if (ecoute < 0) {
-        perror("Connection error: listen failed\n");
-        close(Serveur_dS);
-        return ecoute;
-    }
-    
-    printf("Listening mode\n");
-
 
     /*
     One of the problem is to find who is to know who is the sender and who is the receiver for the start, given that this is alternante next
     The idea here is that the both clients send their type to be affected the correct role
     */
 
-    //Creating the thread that will handle the connection of new client
-
-    pthread_t thread_add_client;
-
-    int k = pthread_create(&thread_add_client, NULL, get_client, &Serveur_dS);
-
-    //Waiting for the close of the thread
-
-    pthread_join(thread_add_client,NULL);
-
-    printf("Fin du programme");
-
-    shutdownserv();
-
-    return 0;
 
 }
