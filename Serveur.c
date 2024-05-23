@@ -460,6 +460,7 @@ int check_file_exists(const char* filename) {
         return -1;
     }
     fclose(file);
+    printf("File %s exists\n", filename);
     return 1;
 }
 
@@ -478,6 +479,7 @@ int get_free_port(int server_port) {
         struct sockaddr_in adresse = param_socket_adresse(port_str);
         if (bind(test_socket, (struct sockaddr*)&adresse, sizeof(adresse)) == 0) {
             close(test_socket);
+            printf("Found free port: %d\n", port);
             return port;
         }
         close(test_socket);
@@ -532,6 +534,7 @@ struct socket_info create_file_recup_socket(int server_port) {
         info.socket = -1;
         return info;
     }
+    printf("File recovery socket created on port %s\n", port);
 
     return info;
 }
@@ -563,6 +566,14 @@ void* file_recup_socket(void* arg) {
     if (send_file(dSClient, filepath) == -1) {
         return (void*)-1;
     }
+    printf("File %s sent\n", filename);
+
+    // After sending the file
+    if (shutdown(dSClient, SHUT_RDWR) == -1) {
+        perror("Failed to shutdown the socket");
+        return (void*)-1;
+    }
+    printf("Client disconnected from file recup\n");
 
     return (void*)1;
 }
@@ -576,6 +587,12 @@ void* file_recup_socket(void* arg) {
  * @return 1 if the thread is successfully created, -1 otherwise.
 */
 int file_recup_thread(int dS, char * filename) {
+    int fileExists = check_file_exists(filename);
+    if (fileExists == -1) {
+        perror("Error : unreachable file");
+        return -1;
+    }
+
     pthread_t tid;
     struct thread_argument argument = {dS, tid};
     int i = pthread_create(&tid, NULL, file_recup_socket, filename);
@@ -605,6 +622,7 @@ int file_recup_thread(int dS, char * filename) {
         perror("Error in file_recup_socket");
         return -1;
     }
+    printf("Thread created for file %s\n", filename);
 
     return 1;
 }

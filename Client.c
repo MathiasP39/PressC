@@ -83,11 +83,13 @@ void* file_reception(void* args) {
         perror("Failed to open file");
         return NULL;
     }
+    printf("File opened\n");
 
     ssize_t bytes_received;
     while ((bytes_received = recv(actual_args->dS, buffer, sizeof(buffer), 0)) > 0) {
         write(file_fd, buffer, bytes_received);
     }
+    printf("File received\n");
 
     if (bytes_received == -1) {
         perror("Failed to receive file");
@@ -146,8 +148,11 @@ int detect_file_reception(char* message) {
     if (strcmp(token, "/receiving") == 0) {
         token = strtok(NULL, " ");
         char* filename = token;
+        printf("Receiving file : %s\n", filename);
+        token = strtok(NULL, " ");
         token = strtok(NULL, " ");
         char* port = token;
+        printf("Port : %s\n", port);
 
         // Create a new socket to receive the file
         int file_socket = socket(PF_INET, SOCK_STREAM, 0);

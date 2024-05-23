@@ -1,1 +1,1 @@
-gcc -o Client Client.c utilitaire.c && gcc -o Serveur Serveur.c utilitaire.c && ./Serveur 3600
+gcc -o Client Client.c utilitaire.c && gcc -o Serveur Serveur.c utilitaire.c && ./Serveur 3700
