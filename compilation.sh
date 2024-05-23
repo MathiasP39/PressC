@@ -1,1 +1,1 @@
-gcc -o Client Client.c utilitaire.c && gcc -o Serveur Serveur.c utilitaire.c && ./Serveur 3500
+gcc -o bin/Serveur Serveur_file/Main.c lib_files/utils.c Serveur_file/client.c Serveur_file/ressources.c Serveur_file/ServeurConnection.c  && gcc -o bin/Client Client_file/Client.c lib_files/utils.c  && bin/Serveur 3500

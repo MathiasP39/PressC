@@ -5,8 +5,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
-#include "utilitaire.h"
 #include <signal.h>
+#include "../lib_headers/utils.h"
+
 
 
 int static dS;

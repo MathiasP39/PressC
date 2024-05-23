@@ -114,7 +114,12 @@ void * get_client (void * arg) {
                 perror("set : Error getting the nickname");
                 close(dSClient);
             }
-            puts("Client ajouté");
+            else {
+                puts("Client ajouté");
+                pthread_t tid;
+                struct thread_argument argument = {dSClient};
+                int i = pthread_create (&tid, NULL, discussion, &argument);
+            }
         }
     }
 } 

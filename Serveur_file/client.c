@@ -104,9 +104,6 @@ int get_dS(char * username) {
     int i = 0;
     pthread_mutex_lock(&mutex_tab_cli);
     while (i<NB_CLIENT_MAX && res == -1) {
-        if (tab_client[i].socket != -1) {
-            printf("Il y a l'utilisateur : %s qui a le dS : %d \n",tab_client[i].nickname,tab_client[i].socket);
-        } 
         if ( strcmp(username,tab_client[i].nickname) == 0) {
             res = tab_client[i].socket;
         }
@@ -135,7 +132,6 @@ int delete_client (int dS) {
     }
     while (res == -1 && i< NB_CLIENT_MAX) {
         if (tab_client[i].socket == dS) {
-            printf("le nom du supprimé est : %s et sa socket vaut %d\n",tab_client[i].nickname,tab_client[i].socket);
             tab_client[i].socket = -1;
             tab_client[i].nickname = "";
             res = 0;
@@ -249,7 +245,7 @@ int man(int descripteur) {
 void shutdownserv() {
     puts("\nLe serveur va s'éteindre ...");
     send_all(-1, "Le serveur va s'arreter, vous allez etre deconnecter \n");
-    shutdown(getServeurdS(),SHUT_RDWR );
+    close(getServeurdS());
     sleep(1);
     exit(0);
 }
@@ -384,18 +380,19 @@ int set_nickname(int dS) {
     while (compt == -1) {
         compt = 0;
         int res = recv_message(dS, &message);
-        if (res == 0) {
+        if (res == 0) { //Condition if the client has deconnected
             puts("Annulation de connexion d'un client");
             int resultat = delete_client(dS);
             close(dS);
             pthread_exit(NULL);
         }
-        else if (res < 0) {
+        else if (res < 0) {// Condition if the connection encounter an error
             perror("Error receiving the nickname");
             exit(0);
         }
-        else {
+        else { //If the message is fine 
             printf("Pseudo recu : %s \n",message);
+            compt = 0;
             for (int i = 0; i<NB_CLIENT_MAX; i++) {
                 if (strcmp(tab_client[i].nickname,message) == 0) {
                     int sendCheck = send_message(dS, "Pseudo indisponible, veuillez en choisir un autre :\n");
