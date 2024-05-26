@@ -368,6 +368,136 @@ int get_free_port(int server_port) {
     return -1; // No free port found
 }
 
+/**
+ * Creates a socket for file recovery.
+ * 
+ * @param server_port The port number of the server.
+ * @return The socket information structure.
+ */
+struct socket_info create_file_recup_socket(int server_port) {
+    struct socket_info info;
+    info.socket = socket(PF_INET, SOCK_STREAM, 0);
+
+    int port_num = get_free_port(server_port);
+    char* port = malloc(6 * sizeof(char)); // Maximum 5 digits for a port number + null terminator
+    if (port == NULL) {
+        perror("Failed to allocate memory for port");
+        return info;
+    }
+
+    sprintf(port, "%d", port_num);
+    if (port == "-1") {
+        close(info.socket);
+        info.socket = -1;
+        return info;
+    }
+    info.port = port;
+
+    info.adresse = param_socket_adresse(port);
+    if (make_bind(info.socket, info.adresse) != 0) {
+        close(info.socket);
+        info.socket = -1;
+        return info;
+    }
+
+    if (listen(info.socket, 1) < 0) {
+        close(info.socket);
+        info.socket = -1;
+        return info;
+    }
+    printf("File recovery socket created on port %s\n", port);
+
+    return info;
+}
+
+
+/**
+ * Sends a file to a client.
+ * 
+ * @param info The socket information structure.
+ * @param filename The name of the file to send.
+ * @return 1 if the file is successfully sent, -1 otherwise.
+*/
+void* file_recup_socket(void* arg) {
+    char* filename = (char*)arg;
+    struct socket_info info = file_socket; // Get the file sending socket information
+
+    if (info.socket == -1) {
+        return (void*)-1;
+    }
+
+    int dSClient = connect_to_client(info.adresse, info.socket);
+    if (dSClient == -1) {
+        return (void*)-1;
+    }
+
+    char filepath[256];
+    sprintf(filepath, "./biblio/%s", filename);
+
+    if (send_file(dSClient, filepath) == -1) {
+        return (void*)-1;
+    }
+    printf("File %s sent\n", filename);
+
+    // After sending the file
+    if (shutdown(dSClient, SHUT_RDWR) == -1) {
+        perror("Failed to shutdown the socket");
+        return (void*)-1;
+    }
+    printf("Client disconnected from file recup\n");
+
+    return (void*)1;
+}
+
+/**
+ * Sends a file to a client using a new thread.
+ * Uses the recup_file function to send the file.
+ * 
+ * @param dS The client socket descriptor.
+ * @param filename The name of the file to send.
+ * @return 1 if the thread is successfully created, -1 otherwise.
+*/
+int file_recup_thread(int dS, char * filename) {
+    int fileExists = check_file_exists(filename);
+    if (fileExists == -1) {
+        perror("Error : unreachable file");
+        return -1;
+    }
+
+    pthread_t tid;
+    struct thread_argument argument = {dS, tid};
+    int i = pthread_create(&tid, NULL, file_recup_socket, filename);
+    if (i != 0) {
+        perror("Error creating the thread");
+        return -1;
+    }
+
+    // Sends a message to the client to indicate that the file is being sent
+    char notification[256];
+    sprintf(notification, "/receiving %s on %s", filename, file_socket.port);
+    int res = send_message(dS, notification);
+    if (res < 0) {
+        perror("Error sending the notification");
+        return -1;
+    }
+
+    // Wait for the thread to finish
+    void* result;
+    if (pthread_join(tid, &result) != 0) {
+        perror("Error joining the thread");
+        return -1;
+    }
+
+    // Check the result of file_recup_socket
+    if (result == NULL) {
+        perror("Error in file_recup_socket");
+        return -1;
+    }
+    printf("Thread created for file %s\n", filename);
+
+    return 1;
+}
+
 /*
 This function is in charge of detection of commands in a message
 List of case value of return : 
