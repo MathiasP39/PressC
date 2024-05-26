@@ -12,6 +12,12 @@
 
 int static dS;
 
+// Define a structure to hold the arguments
+struct file_reception_args {
+    int dS;
+    char* filename;
+};
+
 /*
 This program generates client for communication
 Launch it with command : ./Client ip port
@@ -29,6 +35,112 @@ char* remove_backslash (char* word) {
         word[strlen(word)-1] = '\0';
     }
     return word;
+}
+
+
+
+/**
+ * Function to receive a asked file from the server.
+*/
+void* file_reception(void* args) {
+    struct file_reception_args* actual_args = (struct file_reception_args*)args;
+    char buffer[1024];
+    char file_name[256];
+    sprintf(file_name, "./files/%s", actual_args->filename);
+
+    int file_fd = open(file_name, O_WRONLY | O_CREAT, 0666); // Create a new file
+
+    if (file_fd == -1) {
+        perror("Failed to open file");
+        return NULL;
+    }
+    printf("File opened\n");
+
+    ssize_t bytes_received;
+    while ((bytes_received = recv(actual_args->dS, buffer, sizeof(buffer), 0)) > 0) {
+        write(file_fd, buffer, bytes_received);
+    }
+    printf("File received\n");
+
+    if (bytes_received == -1) {
+        perror("Failed to receive file");
+        close(file_fd);
+        return NULL;
+    }
+
+    close(file_fd);
+    return (void*)1;
+}
+
+/**
+ * Function to create a thread for file receiving.
+ * This function will be called in message_reception when a specific notification is received from the server.
+ * 
+ * @param dS The socket descriptor to receive the file from.
+ * @return Returns 1 if the thread is successfully created, or -1 if an error occurs.
+*/
+int file_reception_thread(int dS, char* filename) {
+    pthread_t tid;
+    struct file_reception_args file_args;
+    file_args.dS = dS;
+    file_args.filename = filename;
+    int i = pthread_create(&tid, NULL, file_reception, &file_args);
+    if (i != 0) {
+        perror("Error creating thread");
+        return -1;
+    }
+
+    // Wait for the thread to finish
+    void* result;
+    if (pthread_join(tid, &result) != 0) {
+        perror("Error joining the thread");
+        return -1;
+    }
+
+    // Check the result of file_reception
+    if (result == NULL) {
+        perror("Error in file_reception");
+        return -1;
+    }
+
+    return 1;
+}
+
+/**
+ * Function to detect the server's notification to receive a file.
+ * Notification is under this format : "sprintf(notification, "/receiving %s on %d", filename, file_socket.port);" in the server.
+ * Will start the thread for file reception if the notification is detected.
+ * 
+ * @param message The message received from the server.
+ * @return Returns 1 if the notification is detected, 0 if not, or -1 if an error occurs.
+*/
+int detect_file_reception(char* message) {
+    char* token = strtok(message, " ");
+    if (strcmp(token, "/receiving") == 0) {
+        token = strtok(NULL, " ");
+        char* filename = token;
+        printf("Receiving file : %s\n", filename);
+        token = strtok(NULL, " ");
+        token = strtok(NULL, " ");
+        char* port = token;
+        printf("Port : %s\n", port);
+
+        // Create a new socket to receive the file
+        int file_socket = socket(PF_INET, SOCK_STREAM, 0);
+        if (file_socket == -1) {
+            perror("Failed to create file socket");
+            return -1;
+        }
+
+        // Connect to the server
+        if (socket_connection(serveurIP, port, file_socket) != 0) {
+            perror("Failed to connect to the server");
+            return -1;
+        }
+
+        return file_reception_thread(file_socket, filename);
+    }
+    return 0;
 }
 
 /*
