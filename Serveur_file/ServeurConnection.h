@@ -22,4 +22,14 @@ server_info setup_socket(char* port);
  */
 int connect_to_client(server_info params);
 
+int get_free_port(int server_port);
+
+/**
+ * Creates a socket for file recovery.
+ * 
+ * @param server_port The port number of the server.
+ * @return The socket information structure.
+ */
+struct socket_info create_file_recup_socket(int server_port);
+
 #endif

@@ -1,6 +1,12 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+// File management
+#include <dirent.h>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "../lib_headers/utils.h"
 
 /**
