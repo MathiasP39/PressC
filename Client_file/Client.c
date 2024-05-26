@@ -17,6 +17,10 @@
 
 int static dS;
 
+
+char* serveurIP;
+
+
 // Define a structure to hold the arguments
 struct file_reception_args {
     int dS;
@@ -42,7 +46,25 @@ char* remove_backslash (char* word) {
     return word;
 }
 
-
+/*
+Function that connect the socket to the other which is located at the ip and port 
+You need to give the ip, the port and the id
+Return 0 if all went good 
+*/
+int socket_connection (char * ip, char* port,int socket_id) {
+    //Socket connection
+    struct sockaddr_in aS;
+    aS.sin_family = AF_INET;
+    inet_pton(AF_INET,ip,&(aS.sin_addr));
+    aS.sin_port = htons(atoi(port));
+    socklen_t lgA = sizeof(struct sockaddr_in);
+    int checkConnect = connect(socket_id, (struct sockaddr *) &aS, lgA);
+    if (checkConnect == -1){
+        perror("Connection failed");
+        exit(-1);
+    }
+    return 0;
+}
 
 /**
  * Function to receive a asked file from the server.
@@ -50,8 +72,10 @@ char* remove_backslash (char* word) {
 void* file_reception(void* args) {
     struct file_reception_args* actual_args = (struct file_reception_args*)args;
     char buffer[1024];
-    char file_name[256];
-    sprintf(file_name, "./files/%s", actual_args->filename);
+    char* file_name;
+    //sprintf(file_name, "./files/%s", actual_args->filename);
+    file_name = actual_args->filename;
+    printf("nom du fichier %s\n",file_name);
 
     int file_fd = open(file_name, O_WRONLY | O_CREAT, 0666); // Create a new file
 
@@ -170,6 +194,10 @@ void* message_reception (void * args) {
         else {
             puts(message);
         }
+        int checkFile = detect_file_reception(message);
+        if (checkFile == 1) {
+            perror("File received");
+        }
         sleep(0.1);
     }
     pthread_exit(0);
@@ -202,25 +230,6 @@ void* message_sending (void * args) {
     pthread_exit(0);
 }
 
-/*
-Function that connect the socket to the other which is located at the ip and port 
-You need to give the ip, the port and the id
-Return 0 if all went good 
-*/
-int socket_connection (char * ip, char* port,int socket_id) {
-    //Socket connection
-    struct sockaddr_in aS;
-    aS.sin_family = AF_INET;
-    inet_pton(AF_INET,ip,&(aS.sin_addr));
-    aS.sin_port = htons(atoi(port));
-    socklen_t lgA = sizeof(struct sockaddr_in);
-    int checkConnect = connect(socket_id, (struct sockaddr *) &aS, lgA);
-    if (checkConnect == -1){
-        perror("Connection failed");
-        exit(-1);
-    }
-    return 0;
-}
 
 void extinction() {
     puts("You will be disconnected ...");
@@ -248,6 +257,8 @@ int main(int argc, char *argv[]) {
 
     //Socket connection
     socket_connection(argv[1],argv[2],dS);
+
+    serveurIP = argv[1];
 
     pthread_t tid;
     pthread_t tid2;

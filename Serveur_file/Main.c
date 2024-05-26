@@ -159,6 +159,14 @@ int main(int argc, char *argv[]) {
         close(info.dS_Server);
         return ecoute;
     }
+    //File handle
+    file_socket = create_file_recup_socket(atoi(argv[1])); // Create a new socket to send files
+    if (file_socket.socket == -1) {
+        return -1; //error displayed by the function
+    }
+
+    printf("la valeur de file socket est : %s \n", file_socket.port);
+
     
     printf("Listening mode\n");
 

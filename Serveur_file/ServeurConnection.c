@@ -1,6 +1,10 @@
 #include "ServeurConnection.h"
+#include "../lib_headers/utils.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+
+socket_info file_socket;
 
 /**
  * Creates a socket for TCP/IP communication.
@@ -29,7 +33,6 @@ struct sockaddr_in param_socket_adresse(char *port) {
     adresse1.sin_family = AF_INET; // address family
     adresse1.sin_addr.s_addr = INADDR_ANY; // address to accept any incoming messages
     adresse1.sin_port = htons(atoi(port)); // port passed as argument
-    printf("Adresse creation \n");
     return adresse1;
 }
 
@@ -116,8 +119,8 @@ int get_free_port(int server_port) {
  * @param server_port The port number of the server.
  * @return The socket information structure.
  */
-struct socket_info create_file_recup_socket(int server_port) {
-    struct socket_info info;
+socket_info create_file_recup_socket(int server_port) {
+    socket_info info;
     info.socket = socket(PF_INET, SOCK_STREAM, 0);
 
     int port_num = get_free_port(server_port);
@@ -150,5 +153,46 @@ struct socket_info create_file_recup_socket(int server_port) {
     printf("File recovery socket created on port %s\n", port);
 
     return info;
+}
+
+/**
+ * Sends a file to a client.
+ * 
+ * @param info The socket information structure.
+ * @param filename The name of the file to send.
+ * @return 1 if the file is successfully sent, -1 otherwise.
+*/
+void* file_recup_socket(void* arg) {
+    char* filename = (char*)arg;
+    socket_info info = file_socket; // Get the file sending socket information
+
+    if (info.socket == -1) {
+        return (void*)-1;
+    }
+
+    server_info info_server; 
+    info_server.dS_Server = info.socket;
+    info_server.server_address = info.adresse;
+    int dSClient = connect_to_client(info_server);
+    if (dSClient == -1) {
+        return (void*)-1;
+    }
+
+    char filepath[256];
+    sprintf(filepath, "./biblio/%s", filename);
+
+    if (send_file(dSClient, filepath) == -1) {
+        return (void*)-1;
+    }
+    printf("File %s sent\n", filename);
+
+    // After sending the file
+    if (shutdown(dSClient, SHUT_RDWR) == -1) {
+        perror("Failed to shutdown the socket");
+        return (void*)-1;
+    }
+    printf("Client disconnected from file recup\n");
+
+    return (void*)1;
 }
 

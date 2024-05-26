@@ -8,6 +8,15 @@ typedef struct {
     struct sockaddr_in server_address;
 } server_info;
 
+typedef struct {
+    int socket;
+    struct sockaddr_in adresse;
+    char* port;
+}  socket_info;
+ 
+
+extern socket_info file_socket;
+
 server_info setup_socket(char* port);
 
 /**
@@ -30,6 +39,15 @@ int get_free_port(int server_port);
  * @param server_port The port number of the server.
  * @return The socket information structure.
  */
-struct socket_info create_file_recup_socket(int server_port);
+socket_info create_file_recup_socket(int server_port);
+
+/**
+ * Sends a file to a client.
+ * 
+ * @param info The socket information structure.
+ * @param filename The name of the file to send.
+ * @return 1 if the file is successfully sent, -1 otherwise.
+*/
+void* file_recup_socket(void* arg);
 
 #endif
