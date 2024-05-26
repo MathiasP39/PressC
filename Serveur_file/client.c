@@ -296,6 +296,78 @@ int quit (int descripteur) {
     }
 }
 
+// FILE SPECIAL COMMAND HANDLE
+
+
+/**
+ * Lists the files in the server's 'biblio' library and send the list to the client.
+ * Uses update_file_list(const char* directory) function from utilitaire.c, which returns a string containing the list of files.
+ * 
+ * @param descripteur The client socket descriptor.
+ * @return 1 if the list is successfully sent, -1 otherwise.
+ */
+int filelist(int descripteur) {
+    char* file_list = update_file_list("./biblio");
+    if (file_list == NULL) {
+        perror("Unable to get file list");
+        return -1;
+    }
+
+    ssize_t bytes_sent = send(descripteur, file_list, strlen(file_list), 0);
+    free(file_list);  // Free the memory allocated by update_file_list
+
+    if (bytes_sent == -1) {
+        perror("Failed to send file list");
+        return -1;
+    }
+
+    return 1;
+}
+
+/**
+ * Checks if a file exists.
+ * 
+ * @param filename The name of the file to check.
+ * @return 1 if the file exists, -1 otherwise.
+ */
+int check_file_exists(const char* filename) {
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "biblio/%s", filename); // Check in the 'biblio' directory
+
+    FILE* file = fopen(filepath, "r");
+    if (file == NULL) {
+        perror("recup_file: error opening the file");
+        return -1;
+    }
+    fclose(file);
+    printf("File %s exists\n", filename);
+    return 1;
+}
+
+/**
+ * Finds a free port on the server.
+ * 
+ * @return The first free port found, or -1 if no free port is found.
+ */
+int get_free_port(int server_port) {
+    int port = server_port + 1; // Start from the server port + 1
+    char port_str[6]; // Buffer to hold the port number as a string
+
+    while (port < 65535) {
+        int test_socket = socket(PF_INET, SOCK_STREAM, 0);
+        sprintf(port_str, "%d", port); // Convert the port number to a string
+        struct sockaddr_in adresse = param_socket_adresse(port_str);
+        if (bind(test_socket, (struct sockaddr*)&adresse, sizeof(adresse)) == 0) {
+            close(test_socket);
+            printf("Found free port: %d\n", port);
+            return port;
+        }
+        close(test_socket);
+        port++;
+    }
+    return -1; // No free port found
+}
+
 /*
 This function is in charge of detection of commands in a message
 List of case value of return : 
