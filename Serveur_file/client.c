@@ -330,6 +330,13 @@ int analyse(char * arg, int descripteur) {
         }else if (strcmp(tok, "shutdown") == 0) {
             shutdownserv();
         }
+        else if (strcmp(tok, "biblio") == 0) {
+            return filelist(descripteur);
+        }else if (strcmp(tok, "recup") == 0) {
+            tok = strtok(NULL, " ");
+            return file_recup_thread(descripteur, tok);
+        }
+        puts("Aucune commande correspondante");
     }else {return 2;}
 }
 
