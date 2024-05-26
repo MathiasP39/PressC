@@ -72,9 +72,8 @@ int socket_connection (char * ip, char* port,int socket_id) {
 void* file_reception(void* args) {
     struct file_reception_args* actual_args = (struct file_reception_args*)args;
     char buffer[1024];
-    char* file_name;
-    //sprintf(file_name, "./files/%s", actual_args->filename);
-    file_name = actual_args->filename;
+    char file_name[256];
+    sprintf(file_name, "../files/%s", actual_args->filename);
     printf("nom du fichier %s\n",file_name);
 
     int file_fd = open(file_name, O_WRONLY | O_CREAT, 0666); // Create a new file
