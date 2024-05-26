@@ -68,4 +68,70 @@ int recv_message(int descripteur, char** message) {
     }
     return 1; //All went good
 }
+//FILE MANAGEMENT
+
+
+/**
+ * Updates the file list in the specified directory.
+ * 
+ * @param directory The directory path.
+ * @return A string of filenames separated by newlines, or NULL if an error occurs.
+ */
+char* update_file_list(const char* directory) {
+    DIR* dir;
+    struct dirent* entry;
+    char* file_list = malloc(1);  // Start with an empty string
+    *file_list = '\0';
+
+    dir = opendir(directory); // Open the directory
+    if (dir == NULL) {
+        perror("Unable to open directory");
+        return NULL;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        // Ignore the "." and ".." entries
+        if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+            file_list = realloc(file_list, strlen(file_list) + strlen(entry->d_name) + 2);  // +2 for the newline and null terminator
+            strcat(file_list, entry->d_name); // Add the filename to the list
+            strcat(file_list, "\n");
+        }
+    }
+
+    closedir(dir);
+    return file_list;
+}
+
+/**
+ * Sends a file over a given descriptor.
+ * 
+ * @param descripteur The descriptor to send the file through.
+ * @param file_name The name of the file to be sent.
+ * @return Returns 1 if the file was sent successfully, -1 otherwise.
+*/
+int send_file(int descripteur, const char* file_name) {
+    struct stat file_stat;
+    int file_fd = open(file_name, O_RDONLY); // Open the file
+
+    if (file_fd == -1) {
+        perror("Failed to open file");
+        return -1;
+    }
+
+    if (fstat(file_fd, &file_stat) == -1) { // Get the file stats (attributes)
+        perror("Failed to get file stats");
+        close(file_fd);
+        return -1;
+    }
+
+    ssize_t bytes_sent = sendfile(descripteur, file_fd, NULL, file_stat.st_size); // Send the file
+    close(file_fd);
+
+    if (bytes_sent == -1) {
+        perror("Failed to send file");
+        return -1;
+    }
+
+    return 1;
+}
 

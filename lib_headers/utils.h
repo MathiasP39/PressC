@@ -10,5 +10,7 @@ int send_message (int descripteur, char* message);
 
 int recv_message(int descripteur,char ** message);
 
+char* update_file_list(const char* directory);
 
+int send_file(int descripteur, const char* file_name);
 #endif
