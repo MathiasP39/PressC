@@ -7,9 +7,16 @@
 #include <pthread.h>
 #include "utilitaire.h"
 #include <signal.h>
+#include <dirent.h>
+// File management
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 
 int static dS;
+
+char* serveurIP;
 
 /*
 This program generates client for communication
@@ -29,6 +36,145 @@ char* remove_backslash (char* word) {
     }
     return word;
 }
+
+/*
+Function that connect the socket to the other which is located at the ip and port 
+You need to give the ip, the port and the id
+Return 0 if all went good 
+*/
+int socket_connection (char * ip, char* port,int socket_id) {
+    //Socket connection
+    struct sockaddr_in aS;
+    aS.sin_family = AF_INET;
+    inet_pton(AF_INET,ip,&(aS.sin_addr));
+    aS.sin_port = htons(atoi(port));
+    socklen_t lgA = sizeof(struct sockaddr_in);
+    int checkConnect = connect(socket_id, (struct sockaddr *) &aS, lgA);
+    if (checkConnect == -1){
+        perror("Connection failed");
+        exit(-1);
+    }
+    return 0;
+}
+
+
+// FILE MANAGEMENT
+
+
+// Define a structure to hold the arguments
+struct file_reception_args {
+    int dS;
+    char* filename;
+};
+
+
+/**
+ * Function to receive a asked file from the server.
+*/
+void* file_reception(void* args) {
+    struct file_reception_args* actual_args = (struct file_reception_args*)args;
+    char buffer[1024];
+    char file_name[256];
+    sprintf(file_name, "./files/%s", actual_args->filename);
+
+    int file_fd = open(file_name, O_WRONLY | O_CREAT, 0666); // Create a new file
+
+    if (file_fd == -1) {
+        perror("Failed to open file");
+        return NULL;
+    }
+    printf("File opened\n");
+
+    ssize_t bytes_received;
+    while ((bytes_received = recv(actual_args->dS, buffer, sizeof(buffer), 0)) > 0) {
+        write(file_fd, buffer, bytes_received);
+    }
+    printf("File received\n");
+
+    if (bytes_received == -1) {
+        perror("Failed to receive file");
+        close(file_fd);
+        return NULL;
+    }
+
+    close(file_fd);
+    return (void*)1;
+}
+
+/**
+ * Function to create a thread for file receiving.
+ * This function will be called in message_reception when a specific notification is received from the server.
+ * 
+ * @param dS The socket descriptor to receive the file from.
+ * @return Returns 1 if the thread is successfully created, or -1 if an error occurs.
+*/
+int file_reception_thread(int dS, char* filename) {
+    pthread_t tid;
+    struct file_reception_args file_args;
+    file_args.dS = dS;
+    file_args.filename = filename;
+    int i = pthread_create(&tid, NULL, file_reception, &file_args);
+    if (i != 0) {
+        perror("Error creating thread");
+        return -1;
+    }
+
+    // Wait for the thread to finish
+    void* result;
+    if (pthread_join(tid, &result) != 0) {
+        perror("Error joining the thread");
+        return -1;
+    }
+
+    // Check the result of file_reception
+    if (result == NULL) {
+        perror("Error in file_reception");
+        return -1;
+    }
+
+    return 1;
+}
+
+/**
+ * Function to detect the server's notification to receive a file.
+ * Notification is under this format : "sprintf(notification, "/receiving %s on %d", filename, file_socket.port);" in the server.
+ * Will start the thread for file reception if the notification is detected.
+ * 
+ * @param message The message received from the server.
+ * @return Returns 1 if the notification is detected, 0 if not, or -1 if an error occurs.
+*/
+int detect_file_reception(char* message) {
+    char* token = strtok(message, " ");
+    if (strcmp(token, "/receiving") == 0) {
+        token = strtok(NULL, " ");
+        char* filename = token;
+        printf("Receiving file : %s\n", filename);
+        token = strtok(NULL, " ");
+        token = strtok(NULL, " ");
+        char* port = token;
+        printf("Port : %s\n", port);
+
+        // Create a new socket to receive the file
+        int file_socket = socket(PF_INET, SOCK_STREAM, 0);
+        if (file_socket == -1) {
+            perror("Failed to create file socket");
+            return -1;
+        }
+
+        // Connect to the server
+        if (socket_connection(serveurIP, port, file_socket) != 0) {
+            perror("Failed to connect to the server");
+            return -1;
+        }
+
+        return file_reception_thread(file_socket, filename);
+    }
+    return 0;
+}
+
+
+// END OF FILE MANAGEMENT
+
 
 /*
 Function that is used to recep message from another client coming through the server
@@ -51,6 +197,10 @@ void* message_reception (void * args) {
         }
         else {
             puts(message);
+        }
+        int checkFile = detect_file_reception(message);
+        if (checkFile == 1) {
+            perror("File received");
         }
         sleep(0.1);
     }
@@ -84,26 +234,11 @@ void* message_sending (void * args) {
     pthread_exit(0);
 }
 
-/*
-Function that connect the socket to the other which is located at the ip and port 
-You need to give the ip, the port and the id
-Return 0 if all went good 
-*/
-int socket_connection (char * ip, char* port,int socket_id) {
-    //Socket connection
-    struct sockaddr_in aS;
-    aS.sin_family = AF_INET;
-    inet_pton(AF_INET,ip,&(aS.sin_addr));
-    aS.sin_port = htons(atoi(port));
-    socklen_t lgA = sizeof(struct sockaddr_in);
-    int checkConnect = connect(socket_id, (struct sockaddr *) &aS, lgA);
-    if (checkConnect == -1){
-        perror("Connection failed");
-        exit(-1);
-    }
-    return 0;
-}
 
+/**
+ * Function to perform an extinction process.
+ * This function disconnects the client and terminates the program.
+ */
 void extinction() {
     puts("You will be disconnected ...");
     close(dS);
@@ -111,9 +246,12 @@ void extinction() {
     exit(0);
 }
 
+
+// MAIN FUNCTION
+
 int main(int argc, char *argv[]) {
 
-    signal(SIGINT ,extinction);
+    signal(SIGINT, extinction);
 
     //Check of number of argument
     if (argc =! 3) {
@@ -131,8 +269,12 @@ int main(int argc, char *argv[]) {
     //Socket connection
     socket_connection(argv[1],argv[2],dS);
 
+    serveurIP = argv[1];
+
     pthread_t tid;
     pthread_t tid2;
+
+    pthread_t tidfilesnd; //Thread for file sending
 
     printf("Pseudo : ");
 

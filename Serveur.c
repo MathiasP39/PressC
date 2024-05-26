@@ -20,7 +20,9 @@ struct client static *tab_client;
 
 int static server_running = 1;
 
-int static Serveur_dS ;
+int static Serveur_dS;
+
+struct socket_info file_socket;
 
 
 //Command to launch this program : ./Serveur port
@@ -97,7 +99,7 @@ struct sockaddr_in param_socket_adresse(char *port) {
     adresse1.sin_family = AF_INET; // address family
     adresse1.sin_addr.s_addr = INADDR_ANY; // address to accept any incoming messages
     adresse1.sin_port = htons(atoi(port)); // port passed as argument
-    printf("Adresse creation \n");
+    // printf("Adresse creation \n");
     return adresse1;
 }
 
@@ -307,7 +309,7 @@ int whisper(int sender_dS,char * username, char * message) {
  * @param username The username of the client to be kicked.
  * @param tab_client The array of client structures.
  * @param semaphore The semaphore used for synchronization.
- * @return 0 on success, -1 on failure.
+ * @return 1 on success, -1 on failure.
  */
 int kick(char * username) {
     int dS_cible = get_dS(username);
@@ -320,13 +322,13 @@ int kick(char * username) {
         printf("Error kicking the client\n");
     }
     close(dS_cible);
-    return deleteCheck;
+    return 1;
 }
 /**
  * Function to display the contents of a file to a client.
  * 
  * @param descripteur The descriptor of the client.
- * @return 0 on success, -1 on failure.
+ * @return 1 on success, -1 on failure.
  */
 int man(int descripteur) {
     FILE* fichier = NULL;
@@ -339,7 +341,7 @@ int man(int descripteur) {
         }
         fclose(fichier);
     }
-    return 0;
+    return 1;
 }
 
 /**
@@ -375,7 +377,6 @@ int shutdownserv(int dS) {
  * @param descripteur The client socket descriptor.
  * @return 1 if the list is successfully sent, -1 otherwise.
  */
-
 int list(int descripteur) {
     puts("Semaphore List");
     sem_wait(&semaphore_tableau);
@@ -414,9 +415,216 @@ int quit (int descripteur) {
     }
 }
 
-void file(int descripteur) {
-    strcpy(buffer, "Please enter the filename: ");
-    send(descripteur, buffer, sizeof(buffer), 0);
+
+// FILE SPECIAL COMMAND HANDLE
+
+
+/**
+ * Lists the files in the server's 'biblio' library and send the list to the client.
+ * Uses update_file_list(const char* directory) function from utilitaire.c, which returns a string containing the list of files.
+ * 
+ * @param descripteur The client socket descriptor.
+ * @return 1 if the list is successfully sent, -1 otherwise.
+ */
+int filelist(int descripteur) {
+    char* file_list = update_file_list("./biblio");
+    if (file_list == NULL) {
+        perror("Unable to get file list");
+        return -1;
+    }
+
+    ssize_t bytes_sent = send(descripteur, file_list, strlen(file_list), 0);
+    free(file_list);  // Free the memory allocated by update_file_list
+
+    if (bytes_sent == -1) {
+        perror("Failed to send file list");
+        return -1;
+    }
+
+    return 1;
+}
+
+/**
+ * Checks if a file exists.
+ * 
+ * @param filename The name of the file to check.
+ * @return 1 if the file exists, -1 otherwise.
+ */
+int check_file_exists(const char* filename) {
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "biblio/%s", filename); // Check in the 'biblio' directory
+
+    FILE* file = fopen(filepath, "r");
+    if (file == NULL) {
+        perror("recup_file: error opening the file");
+        return -1;
+    }
+    fclose(file);
+    printf("File %s exists\n", filename);
+    return 1;
+}
+
+/**
+ * Finds a free port on the server.
+ * 
+ * @return The first free port found, or -1 if no free port is found.
+ */
+int get_free_port(int server_port) {
+    int port = server_port + 1; // Start from the server port + 1
+    char port_str[6]; // Buffer to hold the port number as a string
+
+    while (port < 65535) {
+        int test_socket = socket(PF_INET, SOCK_STREAM, 0);
+        sprintf(port_str, "%d", port); // Convert the port number to a string
+        struct sockaddr_in adresse = param_socket_adresse(port_str);
+        if (bind(test_socket, (struct sockaddr*)&adresse, sizeof(adresse)) == 0) {
+            close(test_socket);
+            printf("Found free port: %d\n", port);
+            return port;
+        }
+        close(test_socket);
+        port++;
+    }
+    return -1; // No free port found
+}
+
+/**
+ * Structure representing a socket and its address.
+ */
+struct socket_info {
+    int socket;
+    struct sockaddr_in adresse;
+    char* port;
+};
+
+/**
+ * Creates a socket for file recovery.
+ * 
+ * @param server_port The port number of the server.
+ * @return The socket information structure.
+ */
+struct socket_info create_file_recup_socket(int server_port) {
+    struct socket_info info;
+    info.socket = socket(PF_INET, SOCK_STREAM, 0);
+
+    int port_num = get_free_port(server_port);
+    char* port = malloc(6 * sizeof(char)); // Maximum 5 digits for a port number + null terminator
+    if (port == NULL) {
+        perror("Failed to allocate memory for port");
+        return info;
+    }
+
+    sprintf(port, "%d", port_num);
+    if (port == "-1") {
+        close(info.socket);
+        info.socket = -1;
+        return info;
+    }
+    info.port = port;
+
+    info.adresse = param_socket_adresse(port);
+    if (make_bind(info.socket, info.adresse) != 0) {
+        close(info.socket);
+        info.socket = -1;
+        return info;
+    }
+
+    if (listen(info.socket, 1) < 0) {
+        close(info.socket);
+        info.socket = -1;
+        return info;
+    }
+    printf("File recovery socket created on port %s\n", port);
+
+    return info;
+}
+
+
+/**
+ * Sends a file to a client.
+ * 
+ * @param info The socket information structure.
+ * @param filename The name of the file to send.
+ * @return 1 if the file is successfully sent, -1 otherwise.
+*/
+void* file_recup_socket(void* arg) {
+    char* filename = (char*)arg;
+    struct socket_info info = file_socket; // Get the file sending socket information
+
+    if (info.socket == -1) {
+        return (void*)-1;
+    }
+
+    int dSClient = connect_to_client(info.adresse, info.socket);
+    if (dSClient == -1) {
+        return (void*)-1;
+    }
+
+    char filepath[256];
+    sprintf(filepath, "./biblio/%s", filename);
+
+    if (send_file(dSClient, filepath) == -1) {
+        return (void*)-1;
+    }
+    printf("File %s sent\n", filename);
+
+    // After sending the file
+    if (shutdown(dSClient, SHUT_RDWR) == -1) {
+        perror("Failed to shutdown the socket");
+        return (void*)-1;
+    }
+    printf("Client disconnected from file recup\n");
+
+    return (void*)1;
+}
+
+/**
+ * Sends a file to a client using a new thread.
+ * Uses the recup_file function to send the file.
+ * 
+ * @param dS The client socket descriptor.
+ * @param filename The name of the file to send.
+ * @return 1 if the thread is successfully created, -1 otherwise.
+*/
+int file_recup_thread(int dS, char * filename) {
+    int fileExists = check_file_exists(filename);
+    if (fileExists == -1) {
+        perror("Error : unreachable file");
+        return -1;
+    }
+
+    pthread_t tid;
+    struct thread_argument argument = {dS, tid};
+    int i = pthread_create(&tid, NULL, file_recup_socket, filename);
+    if (i != 0) {
+        perror("Error creating the thread");
+        return -1;
+    }
+
+    // Sends a message to the client to indicate that the file is being sent
+    char notification[256];
+    sprintf(notification, "/receiving %s on %s", filename, file_socket.port);
+    int res = send_message(dS, notification);
+    if (res < 0) {
+        perror("Error sending the notification");
+        return -1;
+    }
+
+    // Wait for the thread to finish
+    void* result;
+    if (pthread_join(tid, &result) != 0) {
+        perror("Error joining the thread");
+        return -1;
+    }
+
+    // Check the result of file_recup_socket
+    if (result == NULL) {
+        perror("Error in file_recup_socket");
+        return -1;
+    }
+    printf("Thread created for file %s\n", filename);
+
+    return 1;
 }
 
 /*
@@ -428,37 +636,36 @@ List of case value of return :
     - 0 if the user needs to be disconnected
 */
 int analyse(char * arg, int descripteur) {
-    puts("passage dans analyse");
+    puts("Passage dans analyse");
     puts("Reperage du /");
     if (arg[0] == '/') {
         puts("Reperage du /");
         char *tok = strtok(arg+1, " ");
         if (strcmp(tok, "kick") == 0) {
             tok = strtok(NULL, " ");
-            kick(tok);
-            return 1; // Nothing to do
+            return kick(tok);
         }else if (strcmp(tok, "whisper") == 0) {
             tok = strtok(NULL, " " );
             char * message = strtok(NULL, "\0");
-            whisper(descripteur,tok, message);
-            return 1;
+            return whisper(descripteur,tok, message);
         }else if (strcmp(tok, "close") == 0) {
             return 0; //  0 = need to deconnect
         }else if (strcmp(tok, "man") == 0) {
-            man(descripteur);
-            return 1;
+            return man(descripteur);
         }else if (strcmp(tok, "list") == 0) {
-            list(descripteur);
-            return 1;
+            return list(descripteur);
         }else if (strcmp(tok, "quit") == 0) {
-            puts("passage dans quit");
+            puts("Passage dans quit");
             return quit(descripteur);
         }else if (strcmp(tok, "shutdown") == 0) {
-            shutdownserv(descripteur);
-        }else if (strcmp(tok, "file") == 0) {
-            file();
+            return shutdownserv(descripteur);
+        }else if (strcmp(tok, "biblio") == 0) {
+            return filelist(descripteur);
+        }else if (strcmp(tok, "recup") == 0) {
+            tok = strtok(NULL, " ");
+            return file_recup_thread(descripteur, tok);
         }
-        puts("aucune commande correspondante");
+        puts("Aucune commande correspondante");
     }else {return 2;}
 }
 
@@ -764,6 +971,13 @@ int main(int argc, char *argv[]) {
         close(Serveur_dS);
         return -1;
     }
+
+    //File handle
+    file_socket = create_file_recup_socket(Serveur_dS); // Create a new socket to send files
+    if (file_socket.socket == -1) {
+        return -1; //error displayed by the function
+    }
+    //File handle
 
     tab_client = (struct client*)malloc(NB_CLIENT_MAX * sizeof(struct client));
 
