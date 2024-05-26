@@ -6,6 +6,11 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
+// File management
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+//h file
 #include "../lib_headers/utils.h"
 
 
