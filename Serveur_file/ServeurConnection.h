@@ -31,8 +31,6 @@ server_info setup_socket(char* port);
  */
 int connect_to_client(server_info params);
 
-int get_free_port(int server_port);
-
 /**
  * Creates a socket for file recovery.
  * 
