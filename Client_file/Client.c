@@ -280,6 +280,3 @@ int main(int argc, char *argv[]) {
         extinction();
     }
 }
-
-void send_file() {
-}
