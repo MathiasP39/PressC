@@ -5,18 +5,27 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
-#include "utilitaire.h"
 #include <signal.h>
-#include <dirent.h>
 // File management
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+//h file
+#include "../lib_headers/utils.h"
+
 
 
 int static dS;
 
+
 char* serveurIP;
+
+
+// Define a structure to hold the arguments
+struct file_reception_args {
+    int dS;
+    char* filename;
+};
 
 /*
 This program generates client for communication
@@ -57,17 +66,6 @@ int socket_connection (char * ip, char* port,int socket_id) {
     return 0;
 }
 
-
-// FILE MANAGEMENT
-
-
-// Define a structure to hold the arguments
-struct file_reception_args {
-    int dS;
-    char* filename;
-};
-
-
 /**
  * Function to receive a asked file from the server.
 */
@@ -75,7 +73,8 @@ void* file_reception(void* args) {
     struct file_reception_args* actual_args = (struct file_reception_args*)args;
     char buffer[1024];
     char file_name[256];
-    sprintf(file_name, "./files/%s", actual_args->filename);
+    sprintf(file_name, "../files/%s", actual_args->filename);
+    printf("nom du fichier %s\n",file_name);
 
     int file_fd = open(file_name, O_WRONLY | O_CREAT, 0666); // Create a new file
 
@@ -171,10 +170,6 @@ int detect_file_reception(char* message) {
     }
     return 0;
 }
-
-
-// END OF FILE MANAGEMENT
-
 
 /*
 Function that is used to recep message from another client coming through the server
