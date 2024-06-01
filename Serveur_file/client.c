@@ -6,7 +6,7 @@
 #include "ressources.h"
 #include "../lib_headers/utils.h"
 #include "ServeurConnection.h"
-#define NB_CHANEL = 10; //Number of chanel should be of 1 or more
+#define NB_CHANEL 10 //Number of chanel should be of 1 or more
 
 static pthread_mutex_t mutex_tab_cli;
 
@@ -73,7 +73,7 @@ int client_init () {
         tab_chanel[i].name = "";
         tab_chanel[i].list_of_client = (int*)malloc(NB_CLIENT_MAX*sizeof(int));
         for (int j = 0; j<NB_CLIENT_MAX;++j) {
-            tab_chanel[0].list_of_client[j]=-1
+            tab_chanel[0].list_of_client[j]=-1;
         }
     }
     pthread_mutex_unlock(&mutex_tab_chanel);
@@ -232,6 +232,27 @@ int whisper(int sender_dS,char * username, char * message) {
 }
 
 /**
+ * @param dS socket descriptor of the client that is removed from all chanel
+ * @return 1 if it was successful and 0 if there was any chanel where he was
+*/
+int removeClientAllChanel (int dS) {
+    int i = 0;
+    int res = 0;
+    while (i<NB_CHANEL) {
+        int j = 0;
+        while (j<NB_CLIENT_MAX) {
+            if (tab_chanel[i].list_of_client[j] == dS){
+                tab_chanel[i].list_of_client[j] = -1;
+                res = 1;
+            }
+            j++;
+        }
+        i++;
+    }
+}
+
+
+/**
  * Function to kick a client from the server.
  * 
  * @param username The username of the client to be kicked.
@@ -324,6 +345,7 @@ int list(int descripteur) {
  * @return 1 if the client is successfully removed, -1 otherwise.
  */
 int quit (int descripteur) {
+    removeClientAllChanel(descripteur);
     int res = delete_client(descripteur);
     if (res == 0) {
         close(descripteur);
@@ -437,6 +459,79 @@ int file_recup_thread(int dS, char * filename) {
     return 1;
 }
 
+/**
+ * Function that create a usable chanel 
+ * @param chanel_name The name of the chanel
+ * @return 1 if created and 0 if there isn't enough place for it 
+*/
+int createChanel (char* chanel_name) {
+    int i = 0;
+    int res = 0;
+    while (i<NB_CHANEL && !res) {
+        if (strcmp(tab_chanel[i].name,"")==0) {
+            tab_chanel[i].name = chanel_name;
+            res = 1;
+        }
+        i++;
+    }
+    puts("Chanel created");
+    return res;
+}
+
+/**
+ * Function that handle the add of a client to a chanel
+ * @param dS The socket descriptor of the client who wants to be add
+ * @param chanel_name The name of the chanel concerned
+ * @return 1 if add and 0 if there isn't no place
+ * 
+*/
+int addClientChanel (int dS,char * chanel_name) {
+    int res = 0;
+    pthread_mutex_lock(&mutex_tab_chanel);
+    int i = 0;
+    while (i<NB_CHANEL && res==0) { 
+        if (strcmp(chanel_name, tab_chanel[i].name) == 0) {
+            int j = 0;
+            while (j<NB_CLIENT_MAX && res == 0) {
+                if (tab_chanel[i].list_of_client[j]==-1 ){
+                    tab_chanel[i].list_of_client[j]= dS;
+                    res = 1;
+                }
+                j++;
+            }
+        }
+        i++;
+    }
+    pthread_mutex_unlock(&mutex_tab_chanel);
+    return res;
+}
+
+/**
+ * Function that removes a client from a specific chanel 
+ * @param dS socket descriptor of the client that wants to be removed
+ * @param name name of the chanel concerned 
+ * @return 1 if the client has been removed, 0 if the chanel doesn't exists and -1 if the client doesn't exist in the specified chanel
+*/
+int removeClientChanel (int dS, char* name) {
+    int res = 0;
+    int i = 0;
+    while (i<NB_CHANEL && !res) {
+        if (strcmp(tab_chanel[i].name,name) == 0 ) {
+            res = -1;
+            int j = 0;
+            while (res == -1 && j<NB_CLIENT_MAX){
+                if (tab_chanel[i].list_of_client[j] == dS){
+                    res = 1;
+                    tab_chanel[i].list_of_client[j] = 0;
+                }
+                j++;
+            }
+        }
+        i++;
+    }
+    return res;
+}
+
 /*
 This function is in charge of detection of commands in a message
 List of case value of return : 
@@ -476,8 +571,22 @@ int analyse(char * arg, int descripteur) {
         }else if (strcmp(tok, "recup") == 0) {
             tok = strtok(NULL, " ");
             return file_recup_thread(descripteur, tok);
+        }else if (strcmp(tok, "createChanel") == 0) {
+            tok = strtok(NULL, " ");
+            createChanel(tok);
+        }else if (strcmp(tok, "joinChanel") == 0) {
+            tok = strtok(NULL, " ");
+            addClientChanel(descripteur,tok);
+        }else if (strcmp(tok, "myChanel") == 0) {
+            tok = strtok(NULL, " ");
+            puts("To do, list all chanel where the client is connected");
+        }else if (strcmp(tok, "quitChanel") == 0) {
+            tok = strtok(NULL, " ");
+            removeClientChanel(descripteur,tok);
+        }else if (strcmp(tok, "listChanel") == 0) {
+            tok = strtok(NULL, " ");
+            puts("To do, list all chanel");
         }
-        puts("Aucune commande correspondante");
     }else {return 2;}
 }
 
@@ -498,40 +607,13 @@ int add_client(int dS) {
     while (res == -1 && i < NB_CLIENT_MAX) {
         if (tab_client[i].socket == -1) {
             tab_client[i].socket = dS;
+            addClientChanel(dS,"General");
             res = 0;
         }
         ++i;
     }
     pthread_mutex_unlock(&mutex_tab_cli);
     return res;
-}
-
-/**
- * Function that handle the add of a client to a chanel
- * @param dS The socket descriptor of the client who wants to be add
- * @param chanel_name The name of the chanel concerned
- * @return 1 if add and 0 if there isn't no place
- * 
-*/
-int addClientChanel (int dS,char * chanel_name) {
-    int res = 0;
-    pthread_mutex_lock(&mutex_tab_chanel);
-    int i = 0;
-    while (i<NB_CHANEL && res==0) { 
-        if (strcomp(chanel_name, tab_chanel[i].name) == 0) {
-            int j = 0;
-            while (j<NB_CLIENT_MAX && res == 0) {
-                if (tab_chanel[i].list_of_client[j]==-1 ){
-                    tab_chanel[i].list_of_client[j]= dS;
-                    res = 1;
-                }
-                j++;
-            }
-        }
-        i++;
-    }
-    pthread_mutex_unlock(&mutex_tab_chanel);
-    return res
 }
 
 
