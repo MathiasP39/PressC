@@ -6,8 +6,11 @@
 #include "ressources.h"
 #include "../lib_headers/utils.h"
 #include "ServeurConnection.h"
+#define NB_CHANEL = 10;
 
 static pthread_mutex_t mutex_tab_cli;
+
+static pthread_mutex_t mutex_tab_chanel;
 
 /**
  * @struct thread_argument
@@ -30,10 +33,17 @@ struct client {
     int socket;
 };
 
+struct chanel {
+    char *name;
+    int* list_of_client;
+};
+
 struct client static *tab_client;
+struct chanel static *tab_chanel;
 
 int client_init () {
     tab_client = (struct client*)malloc(NB_CLIENT_MAX * sizeof(struct client));
+    tab_chanel = (struct chanel*)malloc(NB_CHANEL * sizeof(struct chanel));
 
     int res = pthread_mutex_init(&mutex_tab_cli,NULL);
     if (res < 0) {
@@ -41,13 +51,27 @@ int client_init () {
         exit(-1);
     }
 
-    //Initialisation of all value of the tab
+    res = pthread_mutex_init(&mutex_tab_chanel,NULL);
+    if (res < 0) {
+        perror("Init of mutex, error while initialising");
+        exit(-1);
+    }
+
+    //Initialisation of all value of the tab of clients
     pthread_mutex_lock(&mutex_tab_cli);
     for (int i = 0; i<NB_CLIENT_MAX; ++i) {
         tab_client[i].nickname = "";
         tab_client[i].socket = -1;
     }
     pthread_mutex_unlock(&mutex_tab_cli);
+
+    //So we initialise the table of chanel, this table contains the name and the list of client connected to it.
+    pthread_mutex_lock(&mutex_tab_chanel);
+    for (int i = 0; i<NB_CHANEL;++i) {
+        tab_chanel[i].name = "";
+        tab_chanel[i].list_of_client = (int*)malloc(NB_CLIENT_MAX*sizeof(int));
+    }
+    pthread_mutex_unlock(&mutex_tab_chanel);
     return 0;
 }
 
