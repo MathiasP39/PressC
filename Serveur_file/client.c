@@ -6,7 +6,7 @@
 #include "ressources.h"
 #include "../lib_headers/utils.h"
 #include "ServeurConnection.h"
-#define NB_CHANEL = 10;
+#define NB_CHANEL = 10; //Number of chanel should be of 1 or more
 
 static pthread_mutex_t mutex_tab_cli;
 
@@ -67,9 +67,14 @@ int client_init () {
 
     //So we initialise the table of chanel, this table contains the name and the list of client connected to it.
     pthread_mutex_lock(&mutex_tab_chanel);
-    for (int i = 0; i<NB_CHANEL;++i) {
+    tab_chanel[0].list_of_client = (int*)malloc(NB_CLIENT_MAX*sizeof(int));
+    tab_chanel[0].name = "General";
+    for (int i = 1; i<NB_CHANEL;++i) {
         tab_chanel[i].name = "";
         tab_chanel[i].list_of_client = (int*)malloc(NB_CLIENT_MAX*sizeof(int));
+        for (int j = 0; j<NB_CLIENT_MAX;++j) {
+            tab_chanel[0].list_of_client[j]=-1
+        }
     }
     pthread_mutex_unlock(&mutex_tab_chanel);
     return 0;
@@ -499,6 +504,34 @@ int add_client(int dS) {
     }
     pthread_mutex_unlock(&mutex_tab_cli);
     return res;
+}
+
+/**
+ * Function that handle the add of a client to a chanel
+ * @param dS The socket descriptor of the client who wants to be add
+ * @param chanel_name The name of the chanel concerned
+ * @return 1 if add and 0 if there isn't no place
+ * 
+*/
+int addClientChanel (int dS,char * chanel_name) {
+    int res = 0;
+    pthread_mutex_lock(&mutex_tab_chanel);
+    int i = 0;
+    while (i<NB_CHANEL && res==0) { 
+        if (strcomp(chanel_name, tab_chanel[i].name) == 0) {
+            int j = 0;
+            while (j<NB_CLIENT_MAX && res == 0) {
+                if (tab_chanel[i].list_of_client[j]==-1 ){
+                    tab_chanel[i].list_of_client[j]= dS;
+                    res = 1;
+                }
+                j++;
+            }
+        }
+        i++;
+    }
+    pthread_mutex_unlock(&mutex_tab_chanel);
+    return res
 }
 
 
