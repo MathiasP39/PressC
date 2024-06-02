@@ -72,7 +72,7 @@ void * discussion (void * arg) {
             int rep = analyse(message, dS);
             if (rep == 2) { //Case no command
                 strcat(pseudo,message);
-                res = send_all(dS,pseudo);
+                res = send_chanel(dS,pseudo);
                 free(pseudo);
             }
             else if (rep == -1){

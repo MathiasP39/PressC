@@ -84,6 +84,7 @@ int client_init () {
 }
 
 
+
 /**
  * Sends a message to all clients except the sender.
  * 
@@ -102,6 +103,37 @@ int send_all(int socket_sender, char *message) {
         }
     }
     pthread_mutex_unlock(&mutex_tab_cli);
+    return 0;
+}
+
+
+/**
+ */
+int send_chanel(int socket_sender, char *message) {
+    pthread_mutex_lock(&mutex_tab_chanel);
+    int res = 0;
+    int j = 0;
+    while (res == 0 && j<NB_CHANEL) {
+        int i = 0;
+        short trouve = 0;
+        while (i<NB_CLIENT_MAX && trouve == 0) {
+            if (tab_chanel[j].list_of_client[i] == socket_sender) {
+                trouve = 1;
+            }
+            i++;
+        }
+        if (trouve == 1) {
+            i = 0;
+            while (i<NB_CLIENT_MAX){
+                if (tab_chanel[j].list_of_client[i] != -1 && tab_chanel[j].list_of_client[i] != socket_sender){
+                    send_message(tab_chanel[j].list_of_client[i],message);
+                }
+                i++;
+            }
+        }
+        j++;
+    }
+    pthread_mutex_unlock(&mutex_tab_chanel);
     return 0;
 }
 
@@ -269,6 +301,7 @@ int kick(char * username) {
         printf("Unknown user\n");
         return -1;
     }
+    send_message(dS_cible,"You have been kicked");
     int deleteCheck = delete_client(dS_cible);
     if (deleteCheck != 0) {
         printf("Error kicking the client\n");
