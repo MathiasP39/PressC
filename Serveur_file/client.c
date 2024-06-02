@@ -73,7 +73,7 @@ int client_init () {
         tab_chanel[i].name = "";
         tab_chanel[i].list_of_client = (int*)malloc(NB_CLIENT_MAX*sizeof(int));
         for (int j = 0; j<NB_CLIENT_MAX;++j) {
-            tab_chanel[0].list_of_client[j]=-1;
+            tab_chanel[i].list_of_client[j]=-1;
         }
     }
     pthread_mutex_unlock(&mutex_tab_chanel);
@@ -465,16 +465,19 @@ int file_recup_thread(int dS, char * filename) {
  * @return 1 if created and 0 if there isn't enough place for it 
 */
 int createChanel (char* chanel_name) {
+    if (strcmp(chanel_name,"") == 0) {
+        return 0;
+    }
     int i = 0;
     int res = 0;
     while (i<NB_CHANEL && !res) {
         if (strcmp(tab_chanel[i].name,"")==0) {
-            tab_chanel[i].name = chanel_name;
+            tab_chanel[i].name = (char*)malloc(sizeof(chanel_name)+1);
+            strcpy(tab_chanel[i].name,chanel_name);
             res = 1;
         }
         i++;
     }
-    puts("Chanel created");
     return res;
 }
 
@@ -489,13 +492,14 @@ int addClientChanel (int dS,char * chanel_name) {
     int res = 0;
     pthread_mutex_lock(&mutex_tab_chanel);
     int i = 0;
-    while (i<NB_CHANEL && res==0) { 
+    while (i<NB_CHANEL && res==0) {
         if (strcmp(chanel_name, tab_chanel[i].name) == 0) {
             int j = 0;
             while (j<NB_CLIENT_MAX && res == 0) {
                 if (tab_chanel[i].list_of_client[j]==-1 ){
                     tab_chanel[i].list_of_client[j]= dS;
                     res = 1;
+                    puts("Client ajouté a un salon");
                 }
                 j++;
             }
@@ -522,7 +526,7 @@ int removeClientChanel (int dS, char* name) {
             while (res == -1 && j<NB_CLIENT_MAX){
                 if (tab_chanel[i].list_of_client[j] == dS){
                     res = 1;
-                    tab_chanel[i].list_of_client[j] = 0;
+                    tab_chanel[i].list_of_client[j] = -1;
                 }
                 j++;
             }
@@ -530,6 +534,22 @@ int removeClientChanel (int dS, char* name) {
         i++;
     }
     return res;
+}
+
+int displayListClientChanel (int dS) {
+    int i = 0;
+    while (i<NB_CHANEL) {
+        if (strcmp(tab_chanel[i].name,"")!=0){
+            int j = 0;
+            while (j<NB_CLIENT_MAX){
+                if (tab_chanel[i].list_of_client[j] == dS) {
+                    printf("Le client appartient au salon : %s \n", tab_chanel[i].name);
+                }
+                j++;
+            }
+        }
+        i++;
+    }
 }
 
 /*
@@ -573,20 +593,22 @@ int analyse(char * arg, int descripteur) {
             return file_recup_thread(descripteur, tok);
         }else if (strcmp(tok, "createChanel") == 0) {
             tok = strtok(NULL, " ");
-            createChanel(tok);
+            return createChanel(tok);
         }else if (strcmp(tok, "joinChanel") == 0) {
             tok = strtok(NULL, " ");
-            addClientChanel(descripteur,tok);
-        }else if (strcmp(tok, "myChanel") == 0) {
+            return addClientChanel(descripteur,tok);
+        }else if (strcmp(tok, "listChanel") == 0) {
             tok = strtok(NULL, " ");
             puts("To do, list all chanel where the client is connected");
         }else if (strcmp(tok, "quitChanel") == 0) {
             tok = strtok(NULL, " ");
             removeClientChanel(descripteur,tok);
-        }else if (strcmp(tok, "listChanel") == 0) {
+        }else if (strcmp(tok, "myChanel") == 0) {
             tok = strtok(NULL, " ");
-            puts("To do, list all chanel");
-        }
+            displayListClientChanel(descripteur);
+        }else if (strcmp(tok, "deleteChanel") == 0) {
+            tok = strtok(NULL, " ");
+            puts("To do, delete a chanel");}
     }else {return 2;}
 }
 
