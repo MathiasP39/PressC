@@ -513,6 +513,22 @@ int addClientChanel (int dS,char * chanel_name) {
     return res;
 }
 
+int deleteChanel (char* chanel_name) {
+    int i = 0;
+    int res = 0;
+    while (i<NB_CHANEL && !res) {
+        if (strcmp(tab_chanel[i].name,chanel_name)==0){
+            for (int j = 0;j<NB_CLIENT_MAX;++j){
+                tab_chanel[i].list_of_client[j] = -1;
+            }
+            tab_chanel[i].name = "";
+            res = 1;
+        }
+        i++;
+    }
+    return res;
+}
+
 /**
  * Function that removes a client from a specific chanel 
  * @param dS socket descriptor of the client that wants to be removed
@@ -539,6 +555,43 @@ int removeClientChanel (int dS, char* name) {
     return res;
 }
 
+/**
+ * Function that send the list of all existing chanel
+ * @param dS The socket descriptor of the client who is aimed for the sending
+ * @return 1 if all went good and -1 if an error occured
+*/
+int listAllChanel (int dS) {
+    int size = 100*sizeof(char);
+    int i = 0;
+    char * message = (char*)malloc(size);
+    while (i<NB_CHANEL) {
+        if (strcmp(tab_chanel[i].name,"")!=0){
+            int j = 0;
+                printf("Le client appartient au salon : %s \n", tab_chanel[i].name);
+                if (size<strlen(message) + strlen(tab_chanel[i].name)) {
+                    size = strlen(message) + strlen(tab_chanel[i].name)+100*sizeof(char);
+                    char* temp = realloc(message,size);
+                    if (temp == NULL) {
+                        puts("Memory reallocation failed");
+                        free(message);
+                        return -1;
+                    }
+                    message = temp;
+                }
+                strcat(message,tab_chanel[i].name);
+                strcat(message, "\n");
+                send_message(dS,message);
+        }
+        i++;
+    }
+    return 1;
+}
+
+/**
+ * Function that send the list of all the chanel where the user is connected
+ * @param dS The socket descriptor of the client who is aimed for the sending
+ * @return 1 if all went good and -1 if an error occured
+*/
 int displayListClientChanel (int dS) {
     int size = 100*sizeof(char);
     int i = 0;
@@ -555,7 +608,7 @@ int displayListClientChanel (int dS) {
                         if (temp == NULL) {
                             puts("Memory reallocation failed");
                             free(message);
-                            return 1;
+                            return -1;
                         }
                         message = temp;
                     }
@@ -568,6 +621,7 @@ int displayListClientChanel (int dS) {
         }
         i++;
     }
+    return 1
 }
 
 /*
@@ -617,7 +671,7 @@ int analyse(char * arg, int descripteur) {
             return addClientChanel(descripteur,tok);
         }else if (strcmp(tok, "listChanel") == 0) {
             tok = strtok(NULL, " ");
-            puts("To do, list all chanel where the client is connected");
+            listAllChanel(descripteur);
         }else if (strcmp(tok, "quitChanel") == 0) {
             tok = strtok(NULL, " ");
             removeClientChanel(descripteur,tok);
@@ -626,7 +680,8 @@ int analyse(char * arg, int descripteur) {
             displayListClientChanel(descripteur);
         }else if (strcmp(tok, "deleteChanel") == 0) {
             tok = strtok(NULL, " ");
-            puts("To do, delete a chanel");}
+            deleteChanel(tok);
+        }
     }else {return 2;}
 }
 
