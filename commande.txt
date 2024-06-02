@@ -6,7 +6,7 @@ Elles sont à utilisé en début de message
 /man : Donne la liste des commandes existantes !
 /list : Donne la liste des clients connectés (username, dS) !
 /quit : Déconnecte l'utilisateur utilisant la commande du serveur
-/shutdownserv : Eteint le serveur
+/shutdown : Eteint le serveur
 /biblio: Affiche la liste de tout les fichiers disponibles  
 /recup <nom_du_fichier>: Permet de télécharger le fichier en argument
 /send <nom_du_fichier> : Envoie le fichier en argument au serveur
