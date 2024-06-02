@@ -191,7 +191,14 @@ void* message_reception (void * args) {
             pthread_exit(0);
         }
         else {
-            puts(message);
+            if (strcmp(message,"kick") == 0) {
+                puts("You have been kicked");
+                close(*dS);
+                running = 0;
+            }
+            else {
+                puts(message);
+            }
         }
         int checkFile = detect_file_reception(message);
         if (checkFile == 1) {
@@ -219,10 +226,6 @@ void* message_sending (void * args) {
         if (checkSend == -1){
             perror("Send failed");
             exit(EXIT_FAILURE);
-        }
-        if (strcmp(message,"fin") == 0) {
-            puts("Deconnexion de la discussion");
-            running = 0;
         }
         sleep(0.1);
     }
@@ -279,7 +282,4 @@ int main(int argc, char *argv[]) {
     if (pthread_join(tid,NULL) == 0 || pthread_join(tid2,NULL) == 0) {
         extinction();
     }
-}
-
-void send_file() {
 }

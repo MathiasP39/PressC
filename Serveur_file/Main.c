@@ -72,11 +72,10 @@ void * discussion (void * arg) {
             int rep = analyse(message, dS);
             if (rep == 2) { //Case no command
                 strcat(pseudo,message);
-                res = send_all(dS,pseudo);
+                res = send_chanel(dS,pseudo);
                 free(pseudo);
-            }else if (rep == 0) { //Case command /quit 
-                puts("do something");
-            }else if (rep == -1){
+            }
+            else if (rep == -1){
                 puts("Error in the command");
             }
         }

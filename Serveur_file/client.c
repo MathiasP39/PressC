@@ -6,8 +6,11 @@
 #include "ressources.h"
 #include "../lib_headers/utils.h"
 #include "ServeurConnection.h"
+#define NB_CHANEL 10 //Number of chanel should be of 1 or more
 
 static pthread_mutex_t mutex_tab_cli;
+
+static pthread_mutex_t mutex_tab_chanel;
 
 /**
  * @struct thread_argument
@@ -30,10 +33,17 @@ struct client {
     int socket;
 };
 
+struct chanel {
+    char *name;
+    int* list_of_client;
+};
+
 struct client static *tab_client;
+struct chanel static *tab_chanel;
 
 int client_init () {
     tab_client = (struct client*)malloc(NB_CLIENT_MAX * sizeof(struct client));
+    tab_chanel = (struct chanel*)malloc(NB_CHANEL * sizeof(struct chanel));
 
     int res = pthread_mutex_init(&mutex_tab_cli,NULL);
     if (res < 0) {
@@ -41,15 +51,38 @@ int client_init () {
         exit(-1);
     }
 
-    //Initialisation of all value of the tab
+    res = pthread_mutex_init(&mutex_tab_chanel,NULL);
+    if (res < 0) {
+        perror("Init of mutex, error while initialising");
+        exit(-1);
+    }
+
+    //Initialisation of all value of the tab of clients
     pthread_mutex_lock(&mutex_tab_cli);
     for (int i = 0; i<NB_CLIENT_MAX; ++i) {
         tab_client[i].nickname = "";
         tab_client[i].socket = -1;
     }
     pthread_mutex_unlock(&mutex_tab_cli);
+
+    //So we initialise the table of chanel, this table contains the name and the list of client connected to it.
+    pthread_mutex_lock(&mutex_tab_chanel);
+    tab_chanel[0].list_of_client = (int*)malloc(NB_CLIENT_MAX*sizeof(int));
+    tab_chanel[0].name = "General";
+    for (int i = 0; i<NB_CLIENT_MAX;++i) {
+        tab_chanel[0].list_of_client[i]=-1;
+    }
+    for (int i = 1; i<NB_CHANEL;++i) {
+        tab_chanel[i].name = "";
+        tab_chanel[i].list_of_client = (int*)malloc(NB_CLIENT_MAX*sizeof(int));
+        for (int j = 0; j<NB_CLIENT_MAX;++j) {
+            tab_chanel[i].list_of_client[j]=-1;
+        }
+    }
+    pthread_mutex_unlock(&mutex_tab_chanel);
     return 0;
 }
+
 
 
 /**
@@ -70,6 +103,37 @@ int send_all(int socket_sender, char *message) {
         }
     }
     pthread_mutex_unlock(&mutex_tab_cli);
+    return 0;
+}
+
+
+/**
+ */
+int send_chanel(int socket_sender, char *message) {
+    pthread_mutex_lock(&mutex_tab_chanel);
+    int res = 0;
+    int j = 0;
+    while (res == 0 && j<NB_CHANEL) {
+        int i = 0;
+        short trouve = 0;
+        while (i<NB_CLIENT_MAX && trouve == 0) {
+            if (tab_chanel[j].list_of_client[i] == socket_sender) {
+                trouve = 1;
+            }
+            i++;
+        }
+        if (trouve == 1) {
+            i = 0;
+            while (i<NB_CLIENT_MAX){
+                if (tab_chanel[j].list_of_client[i] != -1 && tab_chanel[j].list_of_client[i] != socket_sender){
+                    send_message(tab_chanel[j].list_of_client[i],message);
+                }
+                i++;
+            }
+        }
+        j++;
+    }
+    pthread_mutex_unlock(&mutex_tab_chanel);
     return 0;
 }
 
@@ -203,6 +267,27 @@ int whisper(int sender_dS,char * username, char * message) {
 }
 
 /**
+ * @param dS socket descriptor of the client that is removed from all chanel
+ * @return 1 if it was successful and 0 if there was any chanel where he was
+*/
+int removeClientAllChanel (int dS) {
+    int i = 0;
+    int res = 0;
+    while (i<NB_CHANEL) {
+        int j = 0;
+        while (j<NB_CLIENT_MAX) {
+            if (tab_chanel[i].list_of_client[j] == dS){
+                tab_chanel[i].list_of_client[j] = -1;
+                res = 1;
+            }
+            j++;
+        }
+        i++;
+    }
+}
+
+
+/**
  * Function to kick a client from the server.
  * 
  * @param username The username of the client to be kicked.
@@ -216,6 +301,7 @@ int kick(char * username) {
         printf("Unknown user\n");
         return -1;
     }
+    send_message(dS_cible,"kick");
     int deleteCheck = delete_client(dS_cible);
     if (deleteCheck != 0) {
         printf("Error kicking the client\n");
@@ -295,6 +381,7 @@ int list(int descripteur) {
  * @return 1 if the client is successfully removed, -1 otherwise.
  */
 int quit (int descripteur) {
+    removeClientAllChanel(descripteur);
     int res = delete_client(descripteur);
     if (res == 0) {
         close(descripteur);
@@ -311,7 +398,7 @@ int quit (int descripteur) {
 
 
 /**
- * Lists the files in the server's 'biblio' library and send the list to the client.
+ * Lists the files in the server's 'biblio' directory and send the list to the client.
  * Uses update_file_list(const char* directory) function from utilitaire.c, which returns a string containing the list of files.
  * 
  * @param descripteur The client socket descriptor.
@@ -324,13 +411,8 @@ int filelist(int descripteur) {
         return -1;
     }
 
-    ssize_t bytes_sent = send(descripteur, file_list, strlen(file_list), 0);
+    send_message(descripteur, file_list);
     free(file_list);  // Free the memory allocated by update_file_list
-
-    if (bytes_sent == -1) {
-        perror("Failed to send file list");
-        return -1;
-    }
 
     return 1;
 }
@@ -354,8 +436,6 @@ int check_file_exists(const char* filename) {
     printf("File %s exists\n", filename);
     return 1;
 }
-
-
 
 
 /**
@@ -408,6 +488,184 @@ int file_recup_thread(int dS, char * filename) {
     return 1;
 }
 
+/**
+ * Function that create a usable chanel 
+ * @param chanel_name The name of the chanel
+ * @return 1 if created and 0 if there isn't enough place for it 
+*/
+int createChanel (char* chanel_name) {
+    if (strcmp(chanel_name,"") == 0) {
+        return 0;
+    }
+    int i = 0;
+    int res = 0;
+    while (i<NB_CHANEL && !res) {
+        if (strcmp(tab_chanel[i].name,"")==0) {
+            tab_chanel[i].name = (char*)malloc(sizeof(chanel_name)+1);
+            strcpy(tab_chanel[i].name,chanel_name);
+            res = 1;
+        }
+        i++;
+    }
+    return res;
+}
+
+/**
+ * Function that handle the add of a client to a chanel
+ * @param dS The socket descriptor of the client who wants to be add
+ * @param chanel_name The name of the chanel concerned
+ * @return 1 if add and 0 if there isn't no place
+ * 
+*/
+int ClientJoinChanel (int dS,char * chanel_name) {
+    int add = 0;
+    int del = 0;
+    pthread_mutex_lock(&mutex_tab_chanel);
+    int i = 0;
+    while (i<NB_CHANEL && (add==0 || del == 0)) {
+        if (strcmp(chanel_name, tab_chanel[i].name) == 0) {
+            int j = 0;
+            while (j<NB_CLIENT_MAX && add == 0) {
+                if (tab_chanel[i].list_of_client[j]==-1 ){
+                    tab_chanel[i].list_of_client[j]= dS;
+                    add = 1;
+                    puts("Client ajouté a un salon");
+                }
+                j++;;
+            }
+        }else {
+            int m = 0;
+            while (m<NB_CLIENT_MAX && del == 0) {
+                if (tab_chanel[i].list_of_client[m] == dS){
+                    tab_chanel[i].list_of_client[m] = -1;
+                    del = 1;
+                }
+                m++;
+            }
+        }
+        i++;
+    }
+    pthread_mutex_unlock(&mutex_tab_chanel);
+    return add;
+}
+
+/**
+ * This function handle the delete of a chanel 
+ * @param chanel_name Name of the chanel concerned
+ * @return 1 if the delete was successful and 0 if there wasn't any chanel corresponding 
+*/
+int deleteChanel (char* chanel_name) {
+    int i = 0;
+    int res = 0;
+    while (i<NB_CHANEL && !res) {
+        if (strcmp(tab_chanel[i].name,chanel_name)==0){
+            for (int j = 0;j<NB_CLIENT_MAX;++j){
+                tab_chanel[i].list_of_client[j] = -1;
+            }
+            tab_chanel[i].name = "";
+            res = 1;
+        }
+        i++;
+    }
+    return res;
+}
+
+/**
+ * Function that removes a client from a specific chanel 
+ * @param dS socket descriptor of the client that wants to be removed
+ * @param name name of the chanel concerned 
+ * @return 1 if the client has been removed, 0 if the chanel doesn't exists and -1 if the client doesn't exist in the specified chanel
+*/
+int removeClientChanel (int dS, char* name) {
+    int res = 0;
+    int i = 0;
+    while (i<NB_CHANEL && !res) {
+        if (strcmp(tab_chanel[i].name,name) == 0 ) {
+            res = -1;
+            int j = 0;
+            while (res == -1 && j<NB_CLIENT_MAX){
+                if (tab_chanel[i].list_of_client[j] == dS){
+                    res = 1;
+                    tab_chanel[i].list_of_client[j] = -1;
+                }
+                j++;
+            }
+        }
+        i++;
+    }
+    return res;
+}
+
+/**
+ * Function that send the list of all existing chanel
+ * @param dS The socket descriptor of the client who is aimed for the sending
+ * @return 1 if all went good and -1 if an error occured
+*/
+int listAllChanel (int dS) {
+    int size = 100*sizeof(char);
+    int i = 0;
+    char * message = (char*)malloc(size);
+    while (i<NB_CHANEL) {
+        if (strcmp(tab_chanel[i].name,"")!=0){
+            int j = 0;
+                if (size<strlen(message) + strlen(tab_chanel[i].name)) {
+                    size = strlen(message) + strlen(tab_chanel[i].name)+100*sizeof(char);
+                    char* temp = realloc(message,size);
+                    if (temp == NULL) {
+                        puts("Memory reallocation failed");
+                        free(message);
+                        return -1;
+                    }
+                    message = temp;
+                }
+                strcat(message,tab_chanel[i].name);
+                strcat(message, "\n");
+                send_message(dS,message);
+        }
+        i++;
+    }
+    return 1;
+}
+
+/**
+ * Function that send the list of all the chanel where the user is connected
+ * @param dS The socket descriptor of the client who is aimed for the sending
+ * @return 1 if all went good and -1 if an error occured
+*/
+int displayClientChanel (int dS) {
+    int size = 100*sizeof(char);
+    int i = 0;
+    char * message = (char*)malloc(size);
+    while (i<NB_CHANEL) {
+        if (strcmp(tab_chanel[i].name,"")!=0){
+            int j = 0;
+            while (j<NB_CLIENT_MAX){
+                puts("Recherche dans salon");
+                printf("Valeur des dS : %d \n",tab_chanel[i].list_of_client[j]);
+                if (tab_chanel[i].list_of_client[j] == dS) {
+                    printf("Le client appartient au salon : %s \n", tab_chanel[i].name);
+                    if (size<strlen(message) + strlen(tab_chanel[i].name)) {
+                        size = strlen(message) + strlen(tab_chanel[i].name)+100*sizeof(char);
+                        char* temp = realloc(message,size);
+                        if (temp == NULL) {
+                            puts("Memory reallocation failed");
+                            free(message);
+                            return -1;
+                        }
+                        message = temp;
+                    }
+                    strcat(message,tab_chanel[i].name);
+                    strcat(message, "\n");
+                    send_message(dS,message);
+                }
+                j++;
+            }
+        }
+        i++;
+    }
+    return 1;
+}
+
 /*
 This function is in charge of detection of commands in a message
 List of case value of return : 
@@ -441,14 +699,30 @@ int analyse(char * arg, int descripteur) {
             return quit(descripteur);
         }else if (strcmp(tok, "shutdown") == 0) {
             shutdownserv();
-        }
-        else if (strcmp(tok, "biblio") == 0) {
+        }else if (strcmp(tok, "biblio") == 0) {
             return filelist(descripteur);
         }else if (strcmp(tok, "recup") == 0) {
             tok = strtok(NULL, " ");
             return file_recup_thread(descripteur, tok);
+        }else if (strcmp(tok, "createChanel") == 0) {
+            tok = strtok(NULL, " ");
+            return createChanel(tok);
+        }else if (strcmp(tok, "joinChanel") == 0) {
+            tok = strtok(NULL, " ");
+            return ClientJoinChanel(descripteur,tok);
+        }else if (strcmp(tok, "listChanel") == 0) {
+            tok = strtok(NULL, " ");
+            listAllChanel(descripteur);
+        }else if (strcmp(tok, "quitChanel") == 0) {
+            tok = strtok(NULL, " ");
+            removeClientChanel(descripteur,tok);
+        }else if (strcmp(tok, "myChanel") == 0) {
+            tok = strtok(NULL, " ");
+            displayClientChanel(descripteur);
+        }else if (strcmp(tok, "deleteChanel") == 0) {
+            tok = strtok(NULL, " ");
+            deleteChanel(tok);
         }
-        puts("Aucune commande correspondante");
     }else {return 2;}
 }
 
@@ -469,6 +743,7 @@ int add_client(int dS) {
     while (res == -1 && i < NB_CLIENT_MAX) {
         if (tab_client[i].socket == -1) {
             tab_client[i].socket = dS;
+            ClientJoinChanel(dS,"General");
             res = 0;
         }
         ++i;

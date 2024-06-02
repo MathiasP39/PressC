@@ -4,13 +4,8 @@
 int client_init ();
 
 /**
- * Sends a message to all clients except the sender.
- * 
- * @param socket_sender The socket descriptor of the sender.
- * @param message The message to send.
- * @param tab_client The array of client socket descriptors.
  */
-int send_all(int socket_sender, char *message);
+int send_chanel(int socket_sender, char *message);
 
 /**
  * Function to get the nickname of a client and store it in the client structure.

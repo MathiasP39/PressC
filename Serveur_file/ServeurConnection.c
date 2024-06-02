@@ -156,3 +156,43 @@ socket_info create_file_recup_socket(int server_port) {
 }
 
 
+/**
+ * Sends a file to a client.
+ * 
+ * @param info The socket information structure.
+ * @param filename The name of the file to send.
+ * @return 1 if the file is successfully sent, -1 otherwise.
+*/
+void* file_recup_socket(void* arg) {
+    char* filename = (char*)arg;
+    socket_info info = file_socket; // Get the file sending socket information
+
+    if (info.socket == -1) {
+        return (void*)-1;
+    }
+
+    server_info info_server; 
+    info_server.dS_Server = info.socket;
+    info_server.server_address = info.adresse;
+    int dSClient = connect_to_client(info_server);
+    if (dSClient == -1) {
+        return (void*)-1;
+    }
+
+    char filepath[256];
+    sprintf(filepath, "./biblio/%s", filename);
+
+    if (send_file(dSClient, filepath) == -1) {
+        return (void*)-1;
+    }
+    printf("File %s sent\n", filename);
+
+    // After sending the file
+    if (shutdown(dSClient, SHUT_RDWR) == -1) {
+        perror("Failed to shutdown the socket");
+        return (void*)-1;
+    }
+    printf("Client disconnected from file recup\n");
+
+    return (void*)1;
+}
