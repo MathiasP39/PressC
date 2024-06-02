@@ -191,7 +191,14 @@ void* message_reception (void * args) {
             pthread_exit(0);
         }
         else {
-            puts(message);
+            if (strcmp(message,"kick") == 0) {
+                puts("You have been kicked");
+                close(*dS);
+                running = 0;
+            }
+            else {
+                puts(message);
+            }
         }
         int checkFile = detect_file_reception(message);
         if (checkFile == 1) {

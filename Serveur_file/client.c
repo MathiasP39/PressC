@@ -301,7 +301,7 @@ int kick(char * username) {
         printf("Unknown user\n");
         return -1;
     }
-    send_message(dS_cible,"You have been kicked");
+    send_message(dS_cible,"kick");
     int deleteCheck = delete_client(dS_cible);
     if (deleteCheck != 0) {
         printf("Error kicking the client\n");

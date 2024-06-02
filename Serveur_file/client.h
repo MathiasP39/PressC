@@ -5,7 +5,7 @@ int client_init ();
 
 /**
  */
-int send_chanel(int socket_sender, char *message)
+int send_chanel(int socket_sender, char *message);
 
 /**
  * Function to get the nickname of a client and store it in the client structure.
