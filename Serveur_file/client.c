@@ -270,10 +270,10 @@ int whisper(int sender_dS,char * username, char * message) {
  * @param dS socket descriptor of the client that is removed from all chanel
  * @return 1 if it was successful and 0 if there was any chanel where he was
 */
-int removeClientAllChanel (int dS) {
+int removeClientChanel (int dS) {
     int i = 0;
     int res = 0;
-    while (i<NB_CHANEL) {
+    while (i<NB_CHANEL && res == 0) {
         int j = 0;
         while (j<NB_CLIENT_MAX) {
             if (tab_chanel[i].list_of_client[j] == dS){
@@ -381,7 +381,7 @@ int list(int descripteur) {
  * @return 1 if the client is successfully removed, -1 otherwise.
  */
 int quit (int descripteur) {
-    removeClientAllChanel(descripteur);
+    removeClientChanel(descripteur);
     int res = delete_client(descripteur);
     if (res == 0) {
         close(descripteur);
@@ -571,32 +571,6 @@ int deleteChanel (char* chanel_name) {
 }
 
 /**
- * Function that removes a client from a specific chanel 
- * @param dS socket descriptor of the client that wants to be removed
- * @param name name of the chanel concerned 
- * @return 1 if the client has been removed, 0 if the chanel doesn't exists and -1 if the client doesn't exist in the specified chanel
-*/
-int removeClientChanel (int dS, char* name) {
-    int res = 0;
-    int i = 0;
-    while (i<NB_CHANEL && !res) {
-        if (strcmp(tab_chanel[i].name,name) == 0 ) {
-            res = -1;
-            int j = 0;
-            while (res == -1 && j<NB_CLIENT_MAX){
-                if (tab_chanel[i].list_of_client[j] == dS){
-                    res = 1;
-                    tab_chanel[i].list_of_client[j] = -1;
-                }
-                j++;
-            }
-        }
-        i++;
-    }
-    return res;
-}
-
-/**
  * Function that send the list of all existing chanel
  * @param dS The socket descriptor of the client who is aimed for the sending
  * @return 1 if all went good and -1 if an error occured
@@ -713,9 +687,6 @@ int analyse(char * arg, int descripteur) {
         }else if (strcmp(tok, "listChanel") == 0) {
             tok = strtok(NULL, " ");
             listAllChanel(descripteur);
-        }else if (strcmp(tok, "quitChanel") == 0) {
-            tok = strtok(NULL, " ");
-            removeClientChanel(descripteur,tok);
         }else if (strcmp(tok, "myChanel") == 0) {
             tok = strtok(NULL, " ");
             displayClientChanel(descripteur);
