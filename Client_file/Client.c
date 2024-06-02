@@ -250,7 +250,9 @@ int send_file_to_server(int dS, char *filename) {
 }
 
 int detect_file_sending(char* message) {
-    char* token = strtok(message, " ");
+    char chaine[1024];
+    strcpy(chaine,message);
+    char* token = strtok(chaine, " ");
     if (strcmp(token, "/send") == 0) {
         token = strtok(NULL, " ");
         if (token == NULL) {
