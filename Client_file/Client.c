@@ -27,6 +27,11 @@ struct file_reception_args {
     char* filename;
 };
 
+struct thread_argument {
+    int descripteur;
+    char *filename;
+};
+
 /*
 This program generates client for communication
 Launch it with command : ./Client ip port
@@ -171,36 +176,119 @@ int detect_file_reception(char* message) {
     return 0;
 }
 
+int check_file_exists(const char* filename) {
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "files/%s", filename);
+
+    FILE* file = fopen(filepath, "r");
+    if (file == NULL) {
+        perror("recup_file: error opening the file");
+        return -1;
+    }
+    fclose(file);
+    printf("File %s exists\n", filename);
+    return 1;
+}
+
+void* send_file_thread(void *arg) {
+    struct thread_argument *argument = (struct thread_argument *)arg;
+
+    int file_fd = open(argument->filename, O_RDONLY);
+    if (file_fd == -1) {
+        perror("Error : unreachable file");
+        return NULL;
+    }
+
+    struct stat file_stat;
+    if (fstat(file_fd, &file_stat) == -1) {
+        perror("Error getting file stats");
+        close(file_fd);
+        return NULL;
+    }
+
+    if (send(argument->descripteur, &file_stat.st_size, sizeof(off_t), 0) == -1) {
+        perror("Error sending file size");
+        close(file_fd);
+        return NULL;
+    }
+
+    if (sendfile(argument->descripteur, file_fd, NULL, file_stat.st_size) == -1) {
+        perror("Error sending file");
+        close(file_fd);
+        return NULL;
+    }
+
+    printf("File %s sent\n", argument->filename);
+    close(file_fd);
+    return (void *)1;
+}
+
+int send_file_to_server(int dS, char *filename) {
+    int fileExists = check_file_exists(filename);
+    if (fileExists == -1) {
+        perror("Error : unreachable file");
+        return -1;
+    }
+
+    pthread_t tid;
+    struct thread_argument argument = {dS, filename};
+    int i = pthread_create(&tid, NULL, send_file_thread, &argument);
+    if (i != 0) {
+        perror("Error creating the thread");
+        return -1;
+    }
+
+    void* result;
+    if (pthread_join(tid, &result) != 0) {
+        perror("Error joining the thread");
+        return -1;
+    }
+
+    if (result == NULL) {
+        perror("Error in send_file_thread");
+        return -1;
+    }
+
+    return 1;
+}
+
 /*
 Function that is used to recep message from another client coming through the server
 Supposed to be used in a thread unless you just want to receip
 Needs the id of the socket to the server in argument
 Return 0 if all went good and -1 if there was an error
 */
-void* message_reception (void * args) {
-    int * dS = (int*) args;
+void* message_reception(void * args) {
+    int *dS = (int*) args;
     int running = 1;
-    char * message;
+    char *message;
     while (running) {
-        int checkReceive = recv_message(*dS, &message); //Reception of message
+        int checkReceive = recv_message(*dS, &message); // Reception of message
         if (checkReceive < 0) {
             perror("Error receiving message");
         }
         else if (checkReceive == 0) {
             puts("Connection disconnected");
-            pthread_exit(0);
+            pthread_exit(NULL);
         }
         else {
-            puts(message);
-        }
-        int checkFile = detect_file_reception(message);
-        if (checkFile == 1) {
-            perror("File received");
+            puts(message);  // Display received message
+
+            int checkFileSending = detect_file_sending(message);
+            if (checkFileSending != 0) {
+                printf("File sending initiated.\n");
+            }
+            int checkFileReception = detect_file_reception(message);
+            if (checkFileReception == 1) {
+                printf("File reception handled.\n");
+            }
+
         }
         sleep(0.1);
     }
-    pthread_exit(0);
+    pthread_exit(NULL);
 }
+
 
 /*
 Function that is used to ensure the sending of message to the server
