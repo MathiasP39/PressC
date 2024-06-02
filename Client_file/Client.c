@@ -180,29 +180,33 @@ void* send_file_thread(void *arg) {
     return (void *)1;
 }
 
-int check_file_exists(const char* filename) {
-    char filepath[256];
-    snprintf(filepath, sizeof(filepath), "files/%s", filename);
-
+char* check_file_exists(const char* filename) {
+    char* filepath = malloc(256 * sizeof(char));
+    if (filepath == NULL) {
+        perror("Failed to allocate memory for filepath");
+        return NULL;
+    }
+    snprintf(filepath, 256, "files/%s", filename);
     FILE* file = fopen(filepath, "r");
     if (file == NULL) {
         perror("recup_file: error opening the file");
-        return -1;
+        free(filepath);
+        return NULL;
     }
     fclose(file);
     printf("File %s exists\n", filename);
-    return 1;
+    return filepath;
 }
 
 int send_file_to_server(int file_socket, char *filename) {
-    int fileExists = check_file_exists(filename);
-    if (fileExists == -1) {
+    char* filepath = check_file_exists(filename);
+    if (filepath == NULL) {
         perror("Error : unreachable file");
         return -1;
     }
 
     pthread_t tid;
-    struct thread_argument argument = {file_socket, filename};
+    struct thread_argument argument = {file_socket, filepath};
     int i = pthread_create(&tid, NULL, send_file_thread, &argument);
     if (i != 0) {
         perror("Error creating the thread");
@@ -220,7 +224,9 @@ int send_file_to_server(int file_socket, char *filename) {
         return -1;
     }
 
-    return 1;
+    free(filepath);
+
+    return 0;
 }
 int detect_file_reception(char* message) {
     char chaine[256];
