@@ -202,7 +202,7 @@ int send_file_to_server(int file_socket, char *filename) {
     }
 
     pthread_t tid;
-    struct thread_argument argument = {dS, filename};
+    struct thread_argument argument = {file_socket, filename};
     int i = pthread_create(&tid, NULL, send_file_thread, &argument);
     if (i != 0) {
         perror("Error creating the thread");
