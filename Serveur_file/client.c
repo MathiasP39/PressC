@@ -69,6 +69,9 @@ int client_init () {
     pthread_mutex_lock(&mutex_tab_chanel);
     tab_chanel[0].list_of_client = (int*)malloc(NB_CLIENT_MAX*sizeof(int));
     tab_chanel[0].name = "General";
+    for (int i = 0; i<NB_CLIENT_MAX;++i) {
+        tab_chanel[0].list_of_client[i]=-1;
+    }
     for (int i = 1; i<NB_CHANEL;++i) {
         tab_chanel[i].name = "";
         tab_chanel[i].list_of_client = (int*)malloc(NB_CLIENT_MAX*sizeof(int));
@@ -537,13 +540,28 @@ int removeClientChanel (int dS, char* name) {
 }
 
 int displayListClientChanel (int dS) {
+    int size = 100*sizeof(char);
     int i = 0;
+    char * message = (char*)malloc(size);
     while (i<NB_CHANEL) {
         if (strcmp(tab_chanel[i].name,"")!=0){
             int j = 0;
             while (j<NB_CLIENT_MAX){
                 if (tab_chanel[i].list_of_client[j] == dS) {
                     printf("Le client appartient au salon : %s \n", tab_chanel[i].name);
+                    if (size<strlen(message) + strlen(tab_chanel[i].name)) {
+                        size = strlen(message) + strlen(tab_chanel[i].name)+100*sizeof(char);
+                        char* temp = realloc(message,size);
+                        if (temp == NULL) {
+                            puts("Memory reallocation failed");
+                            free(message);
+                            return 1;
+                        }
+                        message = temp;
+                    }
+                    strcat(message,tab_chanel[i].name);
+                    strcat(message, "\n");
+                    send_message(dS,message);
                 }
                 j++;
             }
