@@ -191,7 +191,10 @@ int delete_client (int dS) {
     return res;
 }
 
-void* file_reception(void* args) {
+void* file_reception(int descripteur, char* args) {
+    char message[256];
+    snprintf(message, sizeof(message), "/send %s %s", args, file_socket.port);
+    send_message(descripteur, message);
     struct file_reception_args* actual_args = (struct file_reception_args*)args;
     char buffer[1024];
     char file_name[256];
@@ -614,7 +617,7 @@ int analyse(char * arg, int descripteur) {
             return file_recup_thread(descripteur, tok);
         }else if (strcmp(tok, "send") == 0) {
             tok = strtok(NULL, " ");
-            file_reception(tok);
+            file_reception(descripteur, tok);
         }else if (strcmp(tok, "createChanel") == 0) {
             tok = strtok(NULL, " ");
             createChanel(tok);

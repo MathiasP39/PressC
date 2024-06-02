@@ -147,34 +147,6 @@ int file_reception_thread(int dS, char* filename) {
  * @param message The message received from the server.
  * @return Returns 1 if the notification is detected, 0 if not, or -1 if an error occurs.
 */
-int detect_file_reception(char* message) {
-    char* token = strtok(message, " ");
-    if (strcmp(token, "/receiving") == 0) {
-        token = strtok(NULL, " ");
-        char* filename = token;
-        printf("Receiving file : %s\n", filename);
-        token = strtok(NULL, " ");
-        token = strtok(NULL, " ");
-        char* port = token;
-        printf("Port : %s\n", port);
-
-        // Create a new socket to receive the file
-        int file_socket = socket(PF_INET, SOCK_STREAM, 0);
-        if (file_socket == -1) {
-            perror("Failed to create file socket");
-            return -1;
-        }
-
-        // Connect to the server
-        if (socket_connection(serveurIP, port, file_socket) != 0) {
-            perror("Failed to connect to the server");
-            return -1;
-        }
-
-        return file_reception_thread(file_socket, filename);
-    }
-    return 0;
-}
 void* send_file_thread(void *arg) {
     struct thread_argument *argument = (struct thread_argument *)arg;
 
@@ -207,6 +179,7 @@ void* send_file_thread(void *arg) {
     close(file_fd);
     return (void *)1;
 }
+
 int check_file_exists(const char* filename) {
     char filepath[256];
     snprintf(filepath, sizeof(filepath), "files/%s", filename);
@@ -220,7 +193,8 @@ int check_file_exists(const char* filename) {
     printf("File %s exists\n", filename);
     return 1;
 }
-int send_file_to_server(int dS, char *filename) {
+
+int send_file_to_server(int file_socket, char *filename) {
     int fileExists = check_file_exists(filename);
     if (fileExists == -1) {
         perror("Error : unreachable file");
@@ -248,20 +222,70 @@ int send_file_to_server(int dS, char *filename) {
 
     return 1;
 }
+int detect_file_reception(char* message) {
+    char chaine[256];
+    strcpy(chaine,message);
+    char* token = strtok(chaine, " ");
+    if (strcmp(token, "/receiving") == 0) {
+        token = strtok(NULL, " ");
+        char* filename = token;
+        printf("Receiving file : %s\n", filename);
+        token = strtok(NULL, " ");
+        token = strtok(NULL, " ");
+        char* port = token;
+        printf("Port : %s\n", port);
+
+        // Create a new socket to receive the file
+        int file_socket = socket(PF_INET, SOCK_STREAM, 0);
+        if (file_socket == -1) {
+            perror("Failed to create file socket");
+            return -1;
+        }
+
+        // Connect to the server
+        if (socket_connection(serveurIP, port, file_socket) != 0) {
+            perror("Failed to connect to the server");
+            return -1;
+        }
+
+        return file_reception_thread(file_socket, filename);
+    }
+    return 0;
+}
 
 int detect_file_sending(char* message) {
-    char chaine[1024];
+    char chaine[256];
     strcpy(chaine,message);
     char* token = strtok(chaine, " ");
     if (strcmp(token, "/send") == 0) {
         token = strtok(NULL, " ");
         if (token == NULL) {
-            printf("No filename provided.\n");
+            printf("No port provided.\n");
             return -1;
         }
         char* filename = token;
         printf("Sending file: %s\n", filename);
-        int result = send_file_to_server(dS, filename);
+
+        // Receive the port from the server
+        token = strtok(NULL, " ");
+        char* port_buffer = token;
+        printf("Received port: %s\n", port_buffer);
+
+        // Create a new socket to send the file
+        int file_socket = socket(PF_INET, SOCK_STREAM, 0);
+        if (file_socket == -1) {
+            perror("Failed to create file socket");
+            return -1;
+        }
+
+        // Connect to the server
+        if (socket_connection(serveurIP, port_buffer, file_socket) != 0) {
+            perror("Failed to connect to the server");
+            return -1;
+        }
+
+        // Now send the file
+        int result = send_file_to_server(file_socket, filename);
         if (result == 0) {
             printf("File %s sent successfully.\n", filename);
         } else {
@@ -271,6 +295,8 @@ int detect_file_sending(char* message) {
     }
     return 0;
 }
+
+
 
 
 
@@ -296,16 +322,14 @@ void* message_reception(void * args) {
         }
         else {
             puts(message);  // Display received message
-
-            int checkFileSending = detect_file_sending(message);
-            if (checkFileSending != 0) {
-                printf("File sending initiated.\n");
-            }
             int checkFileReception = detect_file_reception(message);
             if (checkFileReception == 1) {
                 printf("File reception handled.\n");
             }
-
+            int checkFileSending = detect_file_sending(message);
+            if (checkFileSending == 1) {
+                printf("File sending handled.\n");
+            }
         }
         sleep(0.1);
     }
