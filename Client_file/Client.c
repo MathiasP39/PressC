@@ -175,21 +175,6 @@ int detect_file_reception(char* message) {
     }
     return 0;
 }
-
-int check_file_exists(const char* filename) {
-    char filepath[256];
-    snprintf(filepath, sizeof(filepath), "files/%s", filename);
-
-    FILE* file = fopen(filepath, "r");
-    if (file == NULL) {
-        perror("recup_file: error opening the file");
-        return -1;
-    }
-    fclose(file);
-    printf("File %s exists\n", filename);
-    return 1;
-}
-
 void* send_file_thread(void *arg) {
     struct thread_argument *argument = (struct thread_argument *)arg;
 
@@ -222,7 +207,19 @@ void* send_file_thread(void *arg) {
     close(file_fd);
     return (void *)1;
 }
+int check_file_exists(const char* filename) {
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "files/%s", filename);
 
+    FILE* file = fopen(filepath, "r");
+    if (file == NULL) {
+        perror("recup_file: error opening the file");
+        return -1;
+    }
+    fclose(file);
+    printf("File %s exists\n", filename);
+    return 1;
+}
 int send_file_to_server(int dS, char *filename) {
     int fileExists = check_file_exists(filename);
     if (fileExists == -1) {
@@ -251,6 +248,30 @@ int send_file_to_server(int dS, char *filename) {
 
     return 1;
 }
+
+int detect_file_sending(char* message) {
+    char* token = strtok(message, " ");
+    if (strcmp(token, "/send") == 0) {
+        token = strtok(NULL, " ");
+        if (token == NULL) {
+            printf("No filename provided.\n");
+            return -1;
+        }
+        char* filename = token;
+        printf("Sending file: %s\n", filename);
+        int result = send_file_to_server(dS, filename);
+        if (result == 0) {
+            printf("File %s sent successfully.\n", filename);
+        } else {
+            printf("Failed to send file %s.\n", filename);
+        }
+        return result;
+    }
+    return 0;
+}
+
+
+
 
 /*
 Function that is used to recep message from another client coming through the server

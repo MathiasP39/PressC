@@ -614,7 +614,7 @@ int analyse(char * arg, int descripteur) {
             return file_recup_thread(descripteur, tok);
         }else if (strcmp(tok, "send") == 0) {
             tok = strtok(NULL, " ");
-            return file_reception(tok);
+            file_reception(tok);
         }else if (strcmp(tok, "createChanel") == 0) {
             tok = strtok(NULL, " ");
             createChanel(tok);
