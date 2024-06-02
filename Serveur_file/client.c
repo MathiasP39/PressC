@@ -491,26 +491,36 @@ int createChanel (char* chanel_name) {
  * @return 1 if add and 0 if there isn't no place
  * 
 */
-int addClientChanel (int dS,char * chanel_name) {
-    int res = 0;
+int ClientJoinChanel (int dS,char * chanel_name) {
+    int add = 0;
+    int del = 0;
     pthread_mutex_lock(&mutex_tab_chanel);
     int i = 0;
-    while (i<NB_CHANEL && res==0) {
+    while (i<NB_CHANEL && (add==0 || del == 0)) {
         if (strcmp(chanel_name, tab_chanel[i].name) == 0) {
             int j = 0;
-            while (j<NB_CLIENT_MAX && res == 0) {
+            while (j<NB_CLIENT_MAX && add == 0) {
                 if (tab_chanel[i].list_of_client[j]==-1 ){
                     tab_chanel[i].list_of_client[j]= dS;
-                    res = 1;
+                    add = 1;
                     puts("Client ajouté a un salon");
                 }
-                j++;
+                j++;;
+            }
+        }else {
+            int m = 0;
+            while (m<NB_CLIENT_MAX && del == 0) {
+                if (tab_chanel[i].list_of_client[m] == dS){
+                    tab_chanel[i].list_of_client[m] = -1;
+                    del = 1;
+                }
+                m++;
             }
         }
         i++;
     }
     pthread_mutex_unlock(&mutex_tab_chanel);
-    return res;
+    return add;
 }
 
 int deleteChanel (char* chanel_name) {
@@ -567,7 +577,6 @@ int listAllChanel (int dS) {
     while (i<NB_CHANEL) {
         if (strcmp(tab_chanel[i].name,"")!=0){
             int j = 0;
-                printf("Le client appartient au salon : %s \n", tab_chanel[i].name);
                 if (size<strlen(message) + strlen(tab_chanel[i].name)) {
                     size = strlen(message) + strlen(tab_chanel[i].name)+100*sizeof(char);
                     char* temp = realloc(message,size);
@@ -592,7 +601,7 @@ int listAllChanel (int dS) {
  * @param dS The socket descriptor of the client who is aimed for the sending
  * @return 1 if all went good and -1 if an error occured
 */
-int displayListClientChanel (int dS) {
+int displayClientChanel (int dS) {
     int size = 100*sizeof(char);
     int i = 0;
     char * message = (char*)malloc(size);
@@ -600,6 +609,8 @@ int displayListClientChanel (int dS) {
         if (strcmp(tab_chanel[i].name,"")!=0){
             int j = 0;
             while (j<NB_CLIENT_MAX){
+                puts("Recherche dans salon");
+                printf("Valeur des dS : %d \n",tab_chanel[i].list_of_client[j]);
                 if (tab_chanel[i].list_of_client[j] == dS) {
                     printf("Le client appartient au salon : %s \n", tab_chanel[i].name);
                     if (size<strlen(message) + strlen(tab_chanel[i].name)) {
@@ -621,7 +632,7 @@ int displayListClientChanel (int dS) {
         }
         i++;
     }
-    return 1
+    return 1;
 }
 
 /*
@@ -657,8 +668,7 @@ int analyse(char * arg, int descripteur) {
             return quit(descripteur);
         }else if (strcmp(tok, "shutdown") == 0) {
             shutdownserv();
-        }
-        else if (strcmp(tok, "biblio") == 0) {
+        }else if (strcmp(tok, "biblio") == 0) {
             return filelist(descripteur);
         }else if (strcmp(tok, "recup") == 0) {
             tok = strtok(NULL, " ");
@@ -668,7 +678,7 @@ int analyse(char * arg, int descripteur) {
             return createChanel(tok);
         }else if (strcmp(tok, "joinChanel") == 0) {
             tok = strtok(NULL, " ");
-            return addClientChanel(descripteur,tok);
+            return ClientJoinChanel(descripteur,tok);
         }else if (strcmp(tok, "listChanel") == 0) {
             tok = strtok(NULL, " ");
             listAllChanel(descripteur);
@@ -677,7 +687,7 @@ int analyse(char * arg, int descripteur) {
             removeClientChanel(descripteur,tok);
         }else if (strcmp(tok, "myChanel") == 0) {
             tok = strtok(NULL, " ");
-            displayListClientChanel(descripteur);
+            displayClientChanel(descripteur);
         }else if (strcmp(tok, "deleteChanel") == 0) {
             tok = strtok(NULL, " ");
             deleteChanel(tok);
@@ -702,7 +712,7 @@ int add_client(int dS) {
     while (res == -1 && i < NB_CLIENT_MAX) {
         if (tab_client[i].socket == -1) {
             tab_client[i].socket = dS;
-            addClientChanel(dS,"General");
+            ClientJoinChanel(dS,"General");
             res = 0;
         }
         ++i;
