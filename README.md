@@ -12,6 +12,16 @@ Ce projet est une application de messagerie implémentée en langage C. Il perme
 - **Gestion des utilisateurs** : Support pour plusieurs utilisateurs connectés simultanément.
 - **Affichage des messages** : Affichage des messages reçus en temps réel.
 
+## Arccitecture du projet 
+
+- Une partie client decomposer en plusieurs "Classes"
+    - Une partie qui gere les connections
+    - Une partie qui s'occupe de gérer les clients au sein du serveur 
+    - Une partie ressource qui permet de mutualiser les variables 
+    - Un main qui gere l'éxecution du serveur
+- Une partie client qui est faites en un one file
+- Une partie librairie utils qui permet de mutualiser certaines fonctions fonctions tel que les fonctions d'envoie de message et de reception par exemple
+
 ## Installation
 
 ### Prérequis
