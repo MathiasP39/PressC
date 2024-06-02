@@ -27,6 +27,11 @@ struct file_reception_args {
     char* filename;
 };
 
+struct thread_argument {
+    int descripteur;
+    char *filename;
+};
+
 /*
 This program generates client for communication
 Launch it with command : ./Client ip port
@@ -142,8 +147,91 @@ int file_reception_thread(int dS, char* filename) {
  * @param message The message received from the server.
  * @return Returns 1 if the notification is detected, 0 if not, or -1 if an error occurs.
 */
+void* send_file_thread(void *arg) {
+    struct thread_argument *argument = (struct thread_argument *)arg;
+
+    int file_fd = open(argument->filename, O_RDONLY);
+    if (file_fd == -1) {
+        perror("Error : unreachable file");
+        return NULL;
+    }
+
+    struct stat file_stat;
+    if (fstat(file_fd, &file_stat) == -1) {
+        perror("Error getting file stats");
+        close(file_fd);
+        return NULL;
+    }
+
+    if (send(argument->descripteur, &file_stat.st_size, sizeof(off_t), 0) == -1) {
+        perror("Error sending file size");
+        close(file_fd);
+        return NULL;
+    }
+
+    if (sendfile(argument->descripteur, file_fd, NULL, file_stat.st_size) == -1) {
+        perror("Error sending file");
+        close(file_fd);
+        return NULL;
+    }
+
+    printf("File %s sent\n", argument->filename);
+    close(file_fd);
+    return (void *)1;
+}
+
+char* check_file_exists(const char* filename) {
+    char* filepath = malloc(256 * sizeof(char));
+    if (filepath == NULL) {
+        perror("Failed to allocate memory for filepath");
+        return NULL;
+    }
+    snprintf(filepath, 256, "files/%s", filename);
+    FILE* file = fopen(filepath, "r");
+    if (file == NULL) {
+        perror("recup_file: error opening the file");
+        free(filepath);
+        return NULL;
+    }
+    fclose(file);
+    printf("File %s exists\n", filename);
+    return filepath;
+}
+
+int send_file_to_server(int file_socket, char *filename) {
+    char* filepath = check_file_exists(filename);
+    if (filepath == NULL) {
+        perror("Error : unreachable file");
+        return -1;
+    }
+
+    pthread_t tid;
+    struct thread_argument argument = {file_socket, filepath};
+    int i = pthread_create(&tid, NULL, send_file_thread, &argument);
+    if (i != 0) {
+        perror("Error creating the thread");
+        return -1;
+    }
+
+    void* result;
+    if (pthread_join(tid, &result) != 0) {
+        perror("Error joining the thread");
+        return -1;
+    }
+
+    if (result == NULL) {
+        perror("Error in send_file_thread");
+        return -1;
+    }
+
+    free(filepath);
+
+    return 0;
+}
 int detect_file_reception(char* message) {
-    char* token = strtok(message, " ");
+    char chaine[256];
+    strcpy(chaine,message);
+    char* token = strtok(chaine, " ");
     if (strcmp(token, "/receiving") == 0) {
         token = strtok(NULL, " ");
         char* filename = token;
@@ -171,26 +259,83 @@ int detect_file_reception(char* message) {
     return 0;
 }
 
+int detect_file_sending(char* message) {
+    char chaine[256];
+    strcpy(chaine,message);
+    char* token = strtok(chaine, " ");
+    if (strcmp(token, "/send") == 0) {
+        token = strtok(NULL, " ");
+        if (token == NULL) {
+            printf("No port provided.\n");
+            return -1;
+        }
+        char* filename = token;
+        printf("Sending file: %s\n", filename);
+
+        // Receive the port from the server
+        token = strtok(NULL, " ");
+        char* port_buffer = token;
+        printf("Received port: %s\n", port_buffer);
+
+        // Create a new socket to send the file
+        int file_socket = socket(PF_INET, SOCK_STREAM, 0);
+        if (file_socket == -1) {
+            perror("Failed to create file socket");
+            return -1;
+        }
+
+        // Connect to the server
+        if (socket_connection(serveurIP, port_buffer, file_socket) != 0) {
+            perror("Failed to connect to the server");
+            return -1;
+        }
+
+        // Now send the file
+        int result = send_file_to_server(file_socket, filename);
+        if (result == 0) {
+            printf("File %s sent successfully.\n", filename);
+        } else {
+            printf("Failed to send file %s.\n", filename);
+        }
+        return result;
+    }
+    return 0;
+}
+
+
+
+
+
+
 /*
 Function that is used to recep message from another client coming through the server
 Supposed to be used in a thread unless you just want to receip
 Needs the id of the socket to the server in argument
 Return 0 if all went good and -1 if there was an error
 */
-void* message_reception (void * args) {
-    int * dS = (int*) args;
+void* message_reception(void * args) {
+    int *dS = (int*) args;
     int running = 1;
-    char * message;
+    char *message;
     while (running) {
-        int checkReceive = recv_message(*dS, &message); //Reception of message
+        int checkReceive = recv_message(*dS, &message); // Reception of message
         if (checkReceive < 0) {
             perror("Error receiving message");
         }
         else if (checkReceive == 0) {
             puts("Connection disconnected");
-            pthread_exit(0);
+            pthread_exit(NULL);
         }
         else {
+            int checkFileReception = detect_file_reception(message);
+            if (checkFileReception == 1) {
+                printf("File reception handled.\n");
+            }
+            int checkFileSending = detect_file_sending(message);
+            if (checkFileSending == 1) {
+                printf("File sending handled.\n");
+            }
+
             if (strcmp(message,"kick") == 0) {
                 puts("You have been kicked");
                 close(*dS);
@@ -200,14 +345,11 @@ void* message_reception (void * args) {
                 puts(message);
             }
         }
-        int checkFile = detect_file_reception(message);
-        if (checkFile == 1) {
-            perror("File received");
-        }
         sleep(0.1);
     }
-    pthread_exit(0);
+    pthread_exit(NULL);
 }
+
 
 /*
 Function that is used to ensure the sending of message to the server

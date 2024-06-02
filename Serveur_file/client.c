@@ -2,7 +2,8 @@
 #include<unistd.h>
 #include <stdlib.h>
 #include <string.h>
- #include <sys/socket.h>
+#include <sys/socket.h>
+#include <fcntl.h>
 #include "ressources.h"
 #include "../lib_headers/utils.h"
 #include "ServeurConnection.h"
@@ -21,7 +22,10 @@ static pthread_mutex_t mutex_tab_chanel;
 struct thread_argument {
     int descripteur;        /**< The file descriptor of the client connection */
 };
-
+struct file_reception_args {
+    int descripteur;
+    char *filename;
+};
 /**
  * @struct client
  * @brief Represents a client connected to the server.
@@ -221,6 +225,42 @@ int delete_client (int dS) {
     }
     return res;
 }
+
+void* file_reception(int descripteur, char* args) {
+    char message[256];
+    snprintf(message, sizeof(message), "/send %s %s", args, file_socket.port);
+    send_message(descripteur, message);
+    char buffer[1024];
+    char file_name[256];
+    snprintf(file_name, sizeof(file_name), "./biblio/%s", args);
+    printf("nom du fichier %s\n", file_name);
+    int file_fd = open(file_name, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (file_fd == -1) {
+        perror("Failed to open file");
+        return NULL;
+    }
+    printf("File opened\n");
+
+    ssize_t bytes_received;
+    while ((bytes_received = recv(descripteur, buffer, sizeof(buffer), 0)) > 0) {
+        if (write(file_fd, buffer, bytes_received) == -1) {
+            perror("Failed to write to file");
+            close(file_fd);
+            return NULL;
+        }
+    }
+
+    if (bytes_received == -1) {
+        perror("Failed to receive file");
+        close(file_fd);
+        return NULL;
+    }
+
+    printf("File received successfully\n");
+    close(file_fd);
+    return (void*)1;
+}
+
 
 /**
  * Sends a private message to a specific user.
@@ -488,6 +528,8 @@ int file_recup_thread(int dS, char * filename) {
     return 1;
 }
 
+
+
 /**
  * Function that create a usable chanel 
  * @param chanel_name The name of the chanel
@@ -678,6 +720,9 @@ int analyse(char * arg, int descripteur) {
         }else if (strcmp(tok, "recup") == 0) {
             tok = strtok(NULL, " ");
             return file_recup_thread(descripteur, tok);
+        }else if (strcmp(tok, "send") == 0) {
+            tok = strtok(NULL, " ");
+            file_reception(descripteur, tok);
         }else if (strcmp(tok, "createChanel") == 0) {
             tok = strtok(NULL, " ");
             return createChanel(tok);
