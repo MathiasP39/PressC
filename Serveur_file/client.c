@@ -398,7 +398,7 @@ int quit (int descripteur) {
 
 
 /**
- * Lists the files in the server's 'biblio' library and send the list to the client.
+ * Lists the files in the server's 'biblio' directory and send the list to the client.
  * Uses update_file_list(const char* directory) function from utilitaire.c, which returns a string containing the list of files.
  * 
  * @param descripteur The client socket descriptor.
@@ -411,13 +411,8 @@ int filelist(int descripteur) {
         return -1;
     }
 
-    ssize_t bytes_sent = send(descripteur, file_list, strlen(file_list), 0);
+    send_message(descripteur, file_list);
     free(file_list);  // Free the memory allocated by update_file_list
-
-    if (bytes_sent == -1) {
-        perror("Failed to send file list");
-        return -1;
-    }
 
     return 1;
 }
@@ -441,8 +436,6 @@ int check_file_exists(const char* filename) {
     printf("File %s exists\n", filename);
     return 1;
 }
-
-
 
 
 /**
@@ -556,6 +549,11 @@ int ClientJoinChanel (int dS,char * chanel_name) {
     return add;
 }
 
+/**
+ * This function handle the delete of a chanel 
+ * @param chanel_name Name of the chanel concerned
+ * @return 1 if the delete was successful and 0 if there wasn't any chanel corresponding 
+*/
 int deleteChanel (char* chanel_name) {
     int i = 0;
     int res = 0;
