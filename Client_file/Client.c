@@ -327,7 +327,6 @@ void* message_reception(void * args) {
             pthread_exit(NULL);
         }
         else {
-            puts(message);  // Display received message
             int checkFileReception = detect_file_reception(message);
             if (checkFileReception == 1) {
                 printf("File reception handled.\n");
@@ -335,6 +334,15 @@ void* message_reception(void * args) {
             int checkFileSending = detect_file_sending(message);
             if (checkFileSending == 1) {
                 printf("File sending handled.\n");
+            }
+
+            if (strcmp(message,"kick") == 0) {
+                puts("You have been kicked");
+                close(*dS);
+                running = 0;
+            }
+            else {
+                puts(message);
             }
         }
         sleep(0.1);
@@ -360,10 +368,6 @@ void* message_sending (void * args) {
         if (checkSend == -1){
             perror("Send failed");
             exit(EXIT_FAILURE);
-        }
-        if (strcmp(message,"fin") == 0) {
-            puts("Deconnexion de la discussion");
-            running = 0;
         }
         sleep(0.1);
     }

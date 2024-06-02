@@ -10,4 +10,8 @@ Elles sont à utilisé en début de message
 /biblio: Affiche la liste de tout les fichiers disponibles  
 /recup <nom_du_fichier>: Permet de télécharger le fichier en argument
 /send <nom_du_fichier> : Envoie le fichier en argument au serveur
-
+/createChanel <nom_du_chanel> : Crée un chanel si une place est disponible
+/joinChanel <nom_du_chanel> : L'utilisateur courant rejoins le chanel cité si il existe
+/listChanel : Envoie la liste de tous les chanels existants
+/myChanel : Envoie le nom du chanel auquel l'utilisateur est actuellement connecté
+/deleteChanel <nom_du_chanel> : Supprime le chanel en argument si il existe
