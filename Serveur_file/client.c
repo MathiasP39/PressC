@@ -195,12 +195,10 @@ void* file_reception(int descripteur, char* args) {
     char message[256];
     snprintf(message, sizeof(message), "/send %s %s", args, file_socket.port);
     send_message(descripteur, message);
-    struct file_reception_args* actual_args = (struct file_reception_args*)args;
     char buffer[1024];
     char file_name[256];
-    snprintf(file_name, sizeof(file_name), "../biblio/%s", actual_args->filename);
+    snprintf(file_name, sizeof(file_name), "./biblio/%s", args);
     printf("nom du fichier %s\n", file_name);
-
     int file_fd = open(file_name, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (file_fd == -1) {
         perror("Failed to open file");
@@ -209,7 +207,7 @@ void* file_reception(int descripteur, char* args) {
     printf("File opened\n");
 
     ssize_t bytes_received;
-    while ((bytes_received = recv(actual_args->descripteur, buffer, sizeof(buffer), 0)) > 0) {
+    while ((bytes_received = recv(descripteur, buffer, sizeof(buffer), 0)) > 0) {
         if (write(file_fd, buffer, bytes_received) == -1) {
             perror("Failed to write to file");
             close(file_fd);
