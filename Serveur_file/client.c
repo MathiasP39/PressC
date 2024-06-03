@@ -655,9 +655,10 @@ int listAllChanel (int dS) {
                     }
                     message = temp;
                 }
-                strcat(message,tab_chanel[i].name);
+                strcpy(message,tab_chanel[i].name);
                 strcat(message, "\n");
                 send_message(dS,message);
+                free(message);
         }
         i++;
     }
@@ -679,19 +680,10 @@ int displayClientChanel (int dS) {
             int j = 0;
             while (j<NB_CLIENT_MAX){
                 if (tab_chanel[i].list_of_client[j] == dS) {
-                    if (size<strlen(message) + strlen(tab_chanel[i].name)) {
-                        size = strlen(message) + strlen(tab_chanel[i].name)+100*sizeof(char);
-                        char* temp = realloc(message,size);
-                        if (temp == NULL) {
-                            puts("Memory reallocation failed");
-                            free(message);
-                            return -1;
-                        }
-                        message = temp;
-                    }
-                    strcat(message,tab_chanel[i].name);
+                    strcpy(message,tab_chanel[i].name);
                     strcat(message, "\n");
                     send_message(dS,message);
+                    free(message);
                 }
                 j++;
             }
