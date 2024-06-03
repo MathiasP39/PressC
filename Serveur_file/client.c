@@ -45,6 +45,9 @@ struct chanel {
 struct client static *tab_client;
 struct chanel static *tab_chanel;
 
+/**
+ * Function that inits all the value of this field, like a constructor in object oriented programming
+*/
 int client_init () {
     tab_client = (struct client*)malloc(NB_CLIENT_MAX * sizeof(struct client));
     tab_chanel = (struct chanel*)malloc(NB_CHANEL * sizeof(struct chanel));
@@ -112,6 +115,11 @@ int send_all(int socket_sender, char *message) {
 
 
 /**
+ * This function is in charge to send the message in the corresponding chanel of the Client
+ * 
+ * @param socket_sender socket descriptor from the client that is the sender
+ * @param message the message to send through the chanel 
+ * @return 1 if all went good
  */
 int send_chanel(int socket_sender, char *message) {
     pthread_mutex_lock(&mutex_tab_chanel);
@@ -138,7 +146,7 @@ int send_chanel(int socket_sender, char *message) {
         j++;
     }
     pthread_mutex_unlock(&mutex_tab_chanel);
-    return 0;
+    return 1;
 }
 
 /**
@@ -226,15 +234,21 @@ int delete_client (int dS) {
     return res;
 }
 
+/**
+ * This function handle the mechanism of file reception from the client 
+ * 
+ * @param descripteur The socket descriptor of the client that is gonna send the file 
+ * @param args The name of the file that will be send and created server side
+*/
 void* file_reception(int descripteur, char* args) {
     char message[256];
     snprintf(message, sizeof(message), "/send %s %s", args, file_socket.port);
-    send_message(descripteur, message);
+    send_message(descripteur, message); //We send the port of the socket where the file will be send 
     char buffer[1024];
     char file_name[256];
-    snprintf(file_name, sizeof(file_name), "./biblio/%s", args);
+    snprintf(file_name, sizeof(file_name), "./biblio/%s", args); //We create the filepath for the file handling
     printf("nom du fichier %s\n", file_name);
-    int file_fd = open(file_name, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    int file_fd = open(file_name, O_WRONLY | O_CREAT | O_TRUNC, 0666); //We create the file 
     if (file_fd == -1) {
         perror("Failed to open file");
         return NULL;
@@ -242,7 +256,8 @@ void* file_reception(int descripteur, char* args) {
     printf("File opened\n");
 
     ssize_t bytes_received;
-    while ((bytes_received = recv(descripteur, buffer, sizeof(buffer), 0)) > 0) {
+    //Loop that is in charge of receiving the file, unless if it is shrinked
+    while ((bytes_received = recv(descripteur, buffer, sizeof(buffer), 0)) > 0) { 
         if (write(file_fd, buffer, bytes_received) == -1) {
             perror("Failed to write to file");
             close(file_fd);
@@ -307,6 +322,8 @@ int whisper(int sender_dS,char * username, char * message) {
 }
 
 /**
+ * Function that delete the client from his current chanel
+ * 
  * @param dS socket descriptor of the client that is removed from all chanel
  * @return 1 if it was successful and 0 if there was any chanel where he was
 */
@@ -531,7 +548,8 @@ int file_recup_thread(int dS, char * filename) {
 
 
 /**
- * Function that create a usable chanel 
+ * Function that create a usable chanel if there is enough place
+ * 
  * @param chanel_name The name of the chanel
  * @return 1 if created and 0 if there isn't enough place for it 
 */
@@ -553,7 +571,8 @@ int createChanel (char* chanel_name) {
 }
 
 /**
- * Function that handle the add of a client to a chanel
+ * Function that handle the add of a client to a chanel and remove from his previous one
+ * 
  * @param dS The socket descriptor of the client who wants to be add
  * @param chanel_name The name of the chanel concerned
  * @return 1 if add and 0 if there isn't no place
@@ -593,6 +612,7 @@ int ClientJoinChanel (int dS,char * chanel_name) {
 
 /**
  * This function handle the delete of a chanel 
+ * 
  * @param chanel_name Name of the chanel concerned
  * @return 1 if the delete was successful and 0 if there wasn't any chanel corresponding 
 */
@@ -614,6 +634,7 @@ int deleteChanel (char* chanel_name) {
 
 /**
  * Function that send the list of all existing chanel
+ * 
  * @param dS The socket descriptor of the client who is aimed for the sending
  * @return 1 if all went good and -1 if an error occured
 */
@@ -645,6 +666,7 @@ int listAllChanel (int dS) {
 
 /**
  * Function that send the list of all the chanel where the user is connected
+ * 
  * @param dS The socket descriptor of the client who is aimed for the sending
  * @return 1 if all went good and -1 if an error occured
 */
@@ -656,10 +678,7 @@ int displayClientChanel (int dS) {
         if (strcmp(tab_chanel[i].name,"")!=0){
             int j = 0;
             while (j<NB_CLIENT_MAX){
-                puts("Recherche dans salon");
-                printf("Valeur des dS : %d \n",tab_chanel[i].list_of_client[j]);
                 if (tab_chanel[i].list_of_client[j] == dS) {
-                    printf("Le client appartient au salon : %s \n", tab_chanel[i].name);
                     if (size<strlen(message) + strlen(tab_chanel[i].name)) {
                         size = strlen(message) + strlen(tab_chanel[i].name)+100*sizeof(char);
                         char* temp = realloc(message,size);
@@ -682,13 +701,16 @@ int displayClientChanel (int dS) {
     return 1;
 }
 
-/*
-This function is in charge of detection of commands in a message
-List of case value of return : 
-    - 1 if nothing to do (/kick)
-    - 2 if there is no command
-    - -1 if there is a problem 
-    - 0 if the user needs to be disconnected
+/**
+* This function is in charge of detection of commands in a message
+* List of case value of return : 
+*    - 1 if nothing to do (/kick)
+*    - 2 if there is no command
+*    - -1 if there is a problem 
+*    - 0 if the user needs to be disconnected
+* @param arg The message that is sent by the client 
+* @param descripteur socket descriptor of the client that has sent the message
+* @return 1 if nothing is to do, 0 if we need to shutdown and 2 if the classic behavior is expected
 */
 int analyse(char * arg, int descripteur) {
     if (arg[0] == '/') {

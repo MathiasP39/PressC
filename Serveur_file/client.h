@@ -1,9 +1,17 @@
 #ifndef Client
 #define ANY_UNIQUE_NAME_HERE
 
+/**
+ * Function that inits all the value of this field, like a constructor in object oriented programming
+*/
 int client_init ();
 
 /**
+ * This function is in charge to send the message in the corresponding chanel of the Client
+ * 
+ * @param socket_sender socket descriptor from the client that is the sender
+ * @param message the message to send through the chanel 
+ * @return 1 if all went good
  */
 int send_chanel(int socket_sender, char *message);
 

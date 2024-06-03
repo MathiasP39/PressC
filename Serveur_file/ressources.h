@@ -5,6 +5,10 @@
 
 #define NB_CLIENT_MAX 10
 
+/**
+ * Function that handle the initialisation of the ressources of this file 
+ * @param dS socket descriptor of the server 
+*/
 int init_ressources (int dS);
 
 int try_lock_sem_nb_client ();
