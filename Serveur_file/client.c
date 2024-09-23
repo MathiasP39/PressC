@@ -752,6 +752,8 @@ int analyse(char * arg, int descripteur) {
         }else if (strcmp(tok, "deleteChanel") == 0) {
             tok = strtok(NULL, " ");
             deleteChanel(tok);
+        }else  {
+            return 2;
         }
     }else {return 2;}
 }

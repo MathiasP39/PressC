@@ -1,5 +1,7 @@
 # PressC
 
+PressC est un projet réalisé par Hebdaut Deniel, Lisandre Begon et Mathias Puyfages dans le cadre du cours de FAR sous la supervision de Monsieur Thomas Godel
+
 ## Introduction
 
 Ce projet est une application de messagerie implémentée en langage C. Il permet aux utilisateurs de se connecter à un serveur, d'exécuter une liste de commandes pour interagir et d'envoyer des messages à d'autres utilisateurs connectés.
